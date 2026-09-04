@@ -10,18 +10,18 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_WAKE_PHRASE: str = os.getenv("ION_WAKE_PHRASE", "Hey Ion")
 DEFAULT_PHONETIC_VARIANTS: List[str] = [
-    v.strip().lower() for v in os.getenv("ION_WAKE_VARIANTS", "hey iron, hey ian").split(",") if v.strip()
+    v.strip().lower() for v in os.getenv("ION_WAKE_VARIANTS", "").split(",") if v.strip()
 ]
 
 class WakeWordDetector:
     """
     Wake word detector for ION assistant.
-    Primary wake phrase: "Hey Ion"
-    Phonetic variants (e.g. "hey iron", "hey ian") are configurable via ION_WAKE_VARIANTS env.
+    Canonical wake phrase: "Hey Ion"
+    Speech-recognition tolerance aliases (e.g. "hey iron", "hey ian") are configurable via ION_WAKE_VARIANTS env.
     """
     def __init__(self, wake_phrase: Optional[str] = None, phonetic_variants: Optional[List[str]] = None):
         self.wake_phrase = wake_phrase or PRIMARY_WAKE_PHRASE
-        self.phonetic_variants = phonetic_variants or DEFAULT_PHONETIC_VARIANTS
+        self.phonetic_variants = phonetic_variants if phonetic_variants is not None else DEFAULT_PHONETIC_VARIANTS
         self.accepted_phrases = list(set([self.wake_phrase.lower().strip()] + [v.lower().strip() for v in self.phonetic_variants]))
 
     def is_wake_word_detected(self, text: str) -> bool:

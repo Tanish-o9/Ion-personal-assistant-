@@ -5,6 +5,7 @@ import { AssistantContext } from '../../contexts/AssistantContext';
 import { postVoice } from '../../services/voiceService';
 import { VoiceStateMachine } from '../../services/voiceStateMachine';
 import { WakeWordDetectorClient } from '../../services/wakeWordDetector';
+import { VADEngine } from '../../services/vadEngine';
 import { VoiceStatus } from '../../types';
 
 const statusMap: Record<VoiceStatus, { label: string; color: string }> = {
@@ -32,12 +33,21 @@ export default function VoicePanel() {
 
   const recognitionRef = useRef<any | null>(null);
   const wakeDetectorRef = useRef<WakeWordDetectorClient | null>(null);
+  const vadEngineRef = useRef<VADEngine | null>(null);
   const stateMachineRef = useRef<VoiceStateMachine | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
+  const isFinalizingRef = useRef(false);
   const voiceStatusRef = useRef(voiceStatus);
+  const handsFreeEnabledRef = useRef(handsFreeEnabled);
+
   useEffect(() => {
     voiceStatusRef.current = voiceStatus;
   }, [voiceStatus]);
+
+  useEffect(() => {
+    handsFreeEnabledRef.current = handsFreeEnabled;
+  }, [handsFreeEnabled]);
 
   // Initialize Voice State Machine
   useEffect(() => {
@@ -52,8 +62,88 @@ export default function VoicePanel() {
     });
   }, [setVoiceStatus]);
 
+  const stopAllAudioResources = useCallback(() => {
+    try {
+      wakeDetectorRef.current?.stop();
+    } catch (_) {}
+    try {
+      recognitionRef.current?.stop();
+    } catch (_) {}
+    try {
+      vadEngineRef.current?.stop();
+    } catch (_) {}
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      } catch (_) {}
+      mediaStreamRef.current = null;
+    }
+  }, []);
+
+  const startWakeListening = useCallback(() => {
+    if (!handsFreeEnabledRef.current || !SpeechRecognition) return;
+
+    isFinalizingRef.current = false;
+    try {
+      recognitionRef.current?.stop();
+    } catch (_) {}
+    try {
+      vadEngineRef.current?.stop();
+    } catch (_) {}
+
+    stateMachineRef.current?.resetToWakeListening();
+
+    if (!wakeDetectorRef.current) {
+      wakeDetectorRef.current = new WakeWordDetectorClient({
+        wakePhrase: 'hey ion',
+        onWakeWordDetected: (fullTranscript) => {
+          if (isFinalizingRef.current) return;
+
+          // Stop wake detector FIRST to free up speech recognition hardware
+          try {
+            wakeDetectorRef.current?.stop();
+          } catch (_) {}
+
+          stateMachineRef.current?.transitionTo('WAKE_DETECTED');
+
+          const cleanText = (fullTranscript || '')
+            .replace(/^hey ion[\s,.]*/i, '')
+            .replace(/^ion[\s,.]*/i, '')
+            .trim();
+
+          if (cleanText.length > 2) {
+            // User spoke the command immediately along with wake phrase
+            setTranscript(cleanText);
+            stateMachineRef.current?.transitionTo('END_OF_TURN');
+            addMessage({ role: 'user', content: cleanText });
+            handleVoiceResponse(cleanText);
+          } else {
+            // Transition to listening for command
+            setTimeout(() => {
+              stateMachineRef.current?.transitionTo('LISTENING');
+              try {
+                recognitionRef.current?.start();
+              } catch (_) {}
+              if (mediaStreamRef.current) {
+                vadEngineRef.current?.start(mediaStreamRef.current);
+              }
+            }, 200);
+          }
+        },
+        onError: (err) => {
+          console.warn('Wake detector warning:', err);
+        },
+      });
+    }
+
+    wakeDetectorRef.current.start();
+  }, []);
+
   const handleVoiceResponse = useCallback(
     async (finalTranscript: string) => {
+      if (isFinalizingRef.current) return;
+      isFinalizingRef.current = true;
+
       const cleanTranscript = finalTranscript
         .replace(/^hey ion[\s,.]*/i, '')
         .replace(/^ion[\s,.]*/i, '')
@@ -62,9 +152,21 @@ export default function VoicePanel() {
       const textToSend = cleanTranscript || finalTranscript.trim();
 
       if (!textToSend) {
-        stateMachineRef.current?.resetToWakeListening();
+        isFinalizingRef.current = false;
+        startWakeListening();
         return;
       }
+
+      // Stop listening while processing & generating response
+      try {
+        recognitionRef.current?.stop();
+      } catch (_) {}
+      try {
+        vadEngineRef.current?.stop();
+      } catch (_) {}
+      try {
+        wakeDetectorRef.current?.stop();
+      } catch (_) {}
 
       try {
         stateMachineRef.current?.transitionTo('PROCESSING');
@@ -72,24 +174,20 @@ export default function VoicePanel() {
         addMessage({ role: 'assistant', content: response.message.content });
         stateMachineRef.current?.transitionTo('SPEAKING');
 
-        // Gate wake detector during TTS speech synthesis to prevent self-listen feedback loop
-        wakeDetectorRef.current?.stop();
-
         const synth = window.speechSynthesis;
         if (synth && 'SpeechSynthesisUtterance' in window) {
+          synth.cancel(); // Stop any pending speech
           const utterance = new SpeechSynthesisUtterance(response.message.content);
           utterance.onend = () => {
-            if (handsFreeEnabled) {
-              wakeDetectorRef.current?.start();
-              stateMachineRef.current?.resetToWakeListening();
+            if (handsFreeEnabledRef.current) {
+              startWakeListening();
             } else {
               stateMachineRef.current?.stop();
             }
           };
           utterance.onerror = () => {
-            if (handsFreeEnabled) {
-              wakeDetectorRef.current?.start();
-              stateMachineRef.current?.resetToWakeListening();
+            if (handsFreeEnabledRef.current) {
+              startWakeListening();
             } else {
               stateMachineRef.current?.stop();
             }
@@ -97,9 +195,8 @@ export default function VoicePanel() {
           synth.speak(utterance);
         } else {
           window.setTimeout(() => {
-            if (handsFreeEnabled) {
-              wakeDetectorRef.current?.start();
-              stateMachineRef.current?.resetToWakeListening();
+            if (handsFreeEnabledRef.current) {
+              startWakeListening();
             } else {
               stateMachineRef.current?.stop();
             }
@@ -108,18 +205,64 @@ export default function VoicePanel() {
       } catch (err: any) {
         setError(err?.message || 'Voice pipeline execution failed.');
         stateMachineRef.current?.transitionTo('ERROR');
+        isFinalizingRef.current = false;
       }
     },
-    [addMessage, currentModel, handsFreeEnabled]
+    [addMessage, currentModel, startWakeListening]
   );
 
-  // Setup Web Speech Recognition
+  // Initialize Microphone Stream & VAD Engine
   useEffect(() => {
     if (!SpeechRecognition) {
-      setError('Voice capture is not supported in this browser.');
+      setError('Voice recognition is not supported in this browser.');
       setVoiceStatus('offline');
       return;
     }
+
+    // Request microphone access explicitly
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          mediaStreamRef.current = stream;
+          setError('');
+
+          // Initialize VAD Engine
+          vadEngineRef.current = new VADEngine({
+            speechThreshold: 15,
+            silenceTimeoutMs: 1500,
+            minSpeechDurationMs: 300,
+            onSpeechStart: () => {
+              stateMachineRef.current?.onSpeechStart();
+            },
+            onSpeechEnd: () => {
+              if (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected') {
+                try {
+                  recognitionRef.current?.stop();
+                } catch (_) {}
+              }
+            },
+          });
+
+          if (handsFreeEnabled) {
+            startWakeListening();
+          }
+        })
+        .catch((err) => {
+          console.error('Microphone permission error:', err);
+          setError('Microphone permission denied or device not accessible. Please grant mic access.');
+          setVoiceStatus('offline');
+        });
+    }
+
+    return () => {
+      stopAllAudioResources();
+    };
+  }, [handsFreeEnabled, startWakeListening, setVoiceStatus, stopAllAudioResources]);
+
+  // Setup Web Speech Recognition for User Command Listening
+  useEffect(() => {
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -144,7 +287,7 @@ export default function VoicePanel() {
         stateMachineRef.current?.onSpeechStart();
       }
 
-      if (finalTranscript) {
+      if (finalTranscript && !isFinalizingRef.current) {
         setTranscript(finalTranscript);
         stateMachineRef.current?.transitionTo('END_OF_TURN');
         addMessage({ role: 'user', content: finalTranscript });
@@ -153,12 +296,17 @@ export default function VoicePanel() {
     };
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech') return;
-      setError(`Voice recognition error: ${event.error || 'unknown error'}`);
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      console.warn('Speech recognition error:', event.error);
     };
 
     recognition.onend = () => {
-      if (handsFreeEnabled && voiceStatusRef.current === 'wake_listening') {
+      // Auto restart listening if in command listening mode and not finalizing
+      if (
+        handsFreeEnabledRef.current &&
+        !isFinalizingRef.current &&
+        (voiceStatusRef.current === 'listening' || voiceStatusRef.current === 'user_speaking')
+      ) {
         try {
           recognition.start();
         } catch (_) {}
@@ -166,39 +314,24 @@ export default function VoicePanel() {
     };
 
     recognitionRef.current = recognition;
-    return () => recognition.stop?.();
-  }, [handleVoiceResponse, addMessage, setVoiceStatus, handsFreeEnabled]);
-
-  // Hands-free mode automatic start
-  useEffect(() => {
-    if (handsFreeEnabled && SpeechRecognition) {
-      wakeDetectorRef.current = new WakeWordDetectorClient({
-        wakePhrase: 'hey ion',
-        onWakeWordDetected: () => {
-          stateMachineRef.current?.transitionTo('WAKE_DETECTED');
-          setTimeout(() => {
-            stateMachineRef.current?.transitionTo('LISTENING');
-            try {
-              recognitionRef.current?.start();
-            } catch (_) {}
-          }, 300);
-        },
-      });
-
-      wakeDetectorRef.current.start();
-      stateMachineRef.current?.resetToWakeListening();
-    } else {
-      wakeDetectorRef.current?.stop();
-    }
-
     return () => {
-      wakeDetectorRef.current?.stop();
+      try {
+        recognition.stop();
+      } catch (_) {}
     };
-  }, [handsFreeEnabled]);
+  }, [handleVoiceResponse, addMessage]);
 
   const toggleHandsFree = () => {
-    setHandsFreeEnabled((prev) => !prev);
+    const nextState = !handsFreeEnabled;
+    setHandsFreeEnabled(nextState);
     setError('');
+
+    if (nextState) {
+      startWakeListening();
+    } else {
+      stopAllAudioResources();
+      stateMachineRef.current?.stop();
+    }
   };
 
   const status = statusMap[voiceStatus] || statusMap['idle'];
