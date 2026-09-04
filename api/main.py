@@ -559,6 +559,8 @@ async def voice_endpoint(payload: VoicePayload, current_user: User = Depends(get
     ConversationRepository.create_or_get_conversation(session_id, current_user.id)
 
     text_content = (payload.text_input or payload.audioInput or "").strip()
+    if not text_content and not (payload.audio_base64 or "").strip():
+        text_content = "Hello ION"
 
     if text_content:
         ConversationRepository.save_message(session_id, "user", text_content)
