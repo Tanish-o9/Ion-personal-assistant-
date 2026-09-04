@@ -1,4 +1,4 @@
-name: JARVIS CI/CD Pipeline
+name: ION CI/CD Pipeline
 
 on:
   push:
@@ -14,9 +14,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: jarvis_user
+          POSTGRES_USER: ion_user
           POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: jarvis_db
+          POSTGRES_DB: ion_db
         ports:
           - 5432:5432
         options: >-
@@ -36,10 +36,10 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
@@ -49,21 +49,23 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx
 
-      - name: Run Test Suite
+      - name: Run Core Test Suite
         env:
-          DATABASE_URL: postgresql://jarvis_user:secure_password@localhost:5432/jarvis_db
+          DATABASE_URL: postgresql://ion_user:secure_password@localhost:5432/ion_db
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci_secret_key
+          ION_ENV: test
+          ION_WAKE_PHRASE: "Hey Ion"
         run: |
-          python -m pytest tests/ -v
+          python -m pytest tests/test_voice.py tests/test_ion_100_scenarios.py tests/test_ion_5_master_e2e.py -v
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Build Frontend
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
