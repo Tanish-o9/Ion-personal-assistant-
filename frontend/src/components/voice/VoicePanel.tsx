@@ -396,6 +396,25 @@ export default function VoicePanel() {
     }
   };
 
+  const runVoiceSimulationTest = async (testQuery = "Hey ION, what can you do?") => {
+    setError('');
+    isFinalizingRef.current = false;
+    stateMachineRef.current?.transitionTo('WAKE_DETECTED');
+    setTranscript(testQuery);
+
+    setTimeout(() => {
+      stateMachineRef.current?.transitionTo('LISTENING');
+      setTimeout(() => {
+        stateMachineRef.current?.transitionTo('USER_SPEAKING');
+        setTimeout(() => {
+          stateMachineRef.current?.transitionTo('END_OF_TURN');
+          addMessage({ role: 'user', content: testQuery });
+          handleVoiceResponse(testQuery);
+        }, 400);
+      }, 300);
+    }, 300);
+  };
+
   const status = statusMap[voiceStatus] || statusMap['idle'];
 
   return (
@@ -411,7 +430,7 @@ export default function VoicePanel() {
       </div>
 
       <div className="mt-8 grid gap-6 md:grid-cols-[1fr_auto]">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={toggleHandsFree}
@@ -435,6 +454,15 @@ export default function VoicePanel() {
           >
             <HiOutlineMicrophone size={22} className="text-cyan-400 animate-pulse" />
             <span className="ml-3">Tap to Speak Now</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => runVoiceSimulationTest()}
+            className="group relative inline-flex items-center justify-center rounded-[1.75rem] border border-indigo-400/30 bg-indigo-500/20 px-6 py-5 font-semibold text-indigo-200 hover:bg-indigo-500/30 transition"
+          >
+            <HiOutlineVolumeUp size={22} className="text-indigo-400 animate-bounce" />
+            <span className="ml-3">Run Voice Pipeline Test</span>
           </motion.button>
         </div>
 
