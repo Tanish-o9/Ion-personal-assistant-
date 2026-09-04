@@ -231,7 +231,10 @@ async def login_endpoint(request: Request, payload: AuthRequestPayload):
             raise HTTPException(status_code=400, detail="Username and password are required.")
 
         user = default_user_store.get_by_username(username)
-        if not user or not verify_password(password, user.password_hash):
+        if not user:
+            p_hash = hash_password(password)
+            user = default_user_store.register_user(username=username, password_hash=p_hash)
+        elif not verify_password(password, user.password_hash):
             raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         token = create_token(user_id=user.id, username=user.username)

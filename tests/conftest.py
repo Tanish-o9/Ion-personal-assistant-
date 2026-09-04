@@ -1,12 +1,14 @@
-import pytest
 import os
+os.environ["DATABASE_URL"] = "sqlite:///./test_ion.db"
+
+import pytest
 from database import Base, engine, init_db
 from orchestrator.security import default_rate_limiter
 
 @pytest.fixture(autouse=True)
 def reset_database_tables():
     """
-    Clears database tables before each test function for total test isolation.
+    Clears test_ion.db database tables before each test function for total test isolation.
     """
     try:
         Base.metadata.drop_all(bind=engine)
