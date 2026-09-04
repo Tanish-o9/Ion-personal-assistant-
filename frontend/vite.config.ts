@@ -7,7 +7,8 @@ export default defineConfig({
     port: 4173,
     open: true,
     proxy: {
-      '/api': 'http://localhost:8001',
+      '/api': 'http://localhost:8000',
+      '/auth': 'http://localhost:8000',
     },
   },
   build: {

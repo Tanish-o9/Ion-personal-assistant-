@@ -191,37 +191,63 @@ async def monitoring_summary_endpoint(current_user: User = Depends(get_current_u
 # --- Auth Endpoints ---
 
 @app.post("/auth/register")
+@app.post("/api/auth/register")
 async def register_endpoint(request: Request, payload: AuthRequestPayload):
-    client_ip = request.client.host if request.client else "unknown"
-    if not default_rate_limiter.is_allowed(f"auth:{client_ip}", max_requests=RATE_LIMIT_LOGIN, window_seconds=60):
-        raise HTTPException(status_code=429, detail="Too many registration requests. Please try again later.")
+    try:
+        client_ip = request.client.host if request.client else "unknown"
+        if not default_rate_limiter.is_allowed(f"auth:{client_ip}", max_requests=RATE_LIMIT_LOGIN, window_seconds=60):
+            raise HTTPException(status_code=429, detail="Too many registration requests. Please try again later.")
 
-    if not payload.username or not payload.password:
-        raise HTTPException(status_code=400, detail="Username and password are required.")
+        username = (payload.username or "").strip()
+        password = (payload.password or "").strip()
 
-    if default_user_store.get_by_username(payload.username):
-        raise HTTPException(status_code=400, detail="Invalid registration data.")
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password are required.")
 
-    p_hash = hash_password(payload.password)
-    user = default_user_store.register_user(username=payload.username, password_hash=p_hash)
-    token = create_token(user_id=user.id, username=user.username)
+        if default_user_store.get_by_username(username):
+            raise HTTPException(status_code=400, detail="User already exists. Please login instead.")
 
-    return {"token": token, "user": user.to_dict()}
+        p_hash = hash_password(password)
+        user = default_user_store.register_user(username=username, password_hash=p_hash)
+        token = create_token(user_id=user.id, username=user.username)
+
+        return {"token": token, "user": user.to_dict()}
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        jarvis_logger.error(f"Registration exception: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/auth/login")
+@app.post("/api/auth/login")
 async def login_endpoint(request: Request, payload: AuthRequestPayload):
-    client_ip = request.client.host if request.client else "unknown"
-    if not default_rate_limiter.is_allowed(f"auth:{client_ip}", max_requests=RATE_LIMIT_LOGIN, window_seconds=60):
-        raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
+    try:
+        client_ip = request.client.host if request.client else "unknown"
+        if not default_rate_limiter.is_allowed(f"auth:{client_ip}", max_requests=RATE_LIMIT_LOGIN, window_seconds=60):
+            raise HTTPException(status_code=429, detail="Too many login attempts. Please try again later.")
 
-    user = default_user_store.get_by_username(payload.username)
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
+        username = (payload.username or "").strip()
+        password = (payload.password or "").strip()
 
-    token = create_token(user_id=user.id, username=user.username)
-    return {"token": token, "user": user.to_dict()}
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password are required.")
+
+        user = default_user_store.get_by_username(username)
+        if not user or not verify_password(password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+        token = create_token(user_id=user.id, username=user.username)
+        return {"token": token, "user": user.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        jarvis_logger.error(f"Login exception: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/auth/me")
+@app.get("/api/auth/me")
 async def get_me_endpoint(current_user: User = Depends(get_current_user)):
     return {"user": current_user.to_dict()}
 
