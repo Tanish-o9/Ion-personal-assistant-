@@ -1,11 +1,11 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { HiOutlineMicrophone, HiOutlineVolumeUp, HiOutlineSparkles } from 'react-icons/hi';
+import { HiOutlineMicrophone, HiOutlineVolumeUp, HiOutlineSparkles, HiOutlineTerminal } from 'react-icons/hi';
 import { AssistantContext } from '../../contexts/AssistantContext';
 import { postVoice } from '../../services/voiceService';
 import { VoiceStateMachine } from '../../services/voiceStateMachine';
 import { WakeWordDetectorClient } from '../../services/wakeWordDetector';
-import { VADEngine } from '../../services/vadEngine';
+import { VADEngine, VADDiagnostics } from '../../services/vadEngine';
 import { VoiceStatus } from '../../types';
 
 const statusMap: Record<VoiceStatus, { label: string; color: string }> = {
@@ -30,6 +30,9 @@ export default function VoicePanel() {
   const [handsFreeEnabled, setHandsFreeEnabled] = useState(true);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [vadInfo, setVadInfo] = useState<VADDiagnostics | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const recognitionRef = useRef<any | null>(null);
   const wakeDetectorRef = useRef<WakeWordDetectorClient | null>(null);
@@ -38,6 +41,7 @@ export default function VoicePanel() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const isFinalizingRef = useRef(false);
+  const isSpeakingTtsRef = useRef(false);
   const voiceStatusRef = useRef(voiceStatus);
   const handsFreeEnabledRef = useRef(handsFreeEnabled);
 
@@ -90,6 +94,9 @@ export default function VoicePanel() {
 
       const cleanTranscript = finalTranscript
         .replace(/^hey ion[\s,.]*/i, '')
+        .replace(/^hi ion[\s,.]*/i, '')
+        .replace(/^hey iron[\s,.]*/i, '')
+        .replace(/^hey ian[\s,.]*/i, '')
         .replace(/^ion[\s,.]*/i, '')
         .trim();
 
@@ -121,28 +128,28 @@ export default function VoicePanel() {
         const responseText = response.message?.content || response.response_text || response.response || 'I am ready to help you.';
         addMessage({ role: 'assistant', content: responseText });
         stateMachineRef.current?.transitionTo('SPEAKING');
+        isSpeakingTtsRef.current = true;
 
         const synth = window.speechSynthesis;
         if (synth && 'SpeechSynthesisUtterance' in window) {
           synth.cancel(); // Stop any pending speech
           const utterance = new SpeechSynthesisUtterance(responseText);
-          utterance.onend = () => {
+
+          const finishTts = () => {
+            isSpeakingTtsRef.current = false;
             if (handsFreeEnabledRef.current) {
               startWakeListening();
             } else {
               stateMachineRef.current?.stop();
             }
           };
-          utterance.onerror = () => {
-            if (handsFreeEnabledRef.current) {
-              startWakeListening();
-            } else {
-              stateMachineRef.current?.stop();
-            }
-          };
+
+          utterance.onend = finishTts;
+          utterance.onerror = finishTts;
           synth.speak(utterance);
         } else {
           window.setTimeout(() => {
+            isSpeakingTtsRef.current = false;
             if (handsFreeEnabledRef.current) {
               startWakeListening();
             } else {
@@ -151,16 +158,18 @@ export default function VoicePanel() {
           }, 2000);
         }
       } catch (err: any) {
+        setErrorCode('WEBSOCKET_DISCONNECTED');
         setError(err?.message || 'Voice pipeline execution failed.');
         stateMachineRef.current?.transitionTo('ERROR');
         isFinalizingRef.current = false;
+        isSpeakingTtsRef.current = false;
       }
     },
     [addMessage, currentModel]
   );
 
   const createAndStartRecognition = useCallback(() => {
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition || isSpeakingTtsRef.current) return;
 
     if (recognitionRef.current) {
       try {
@@ -177,6 +186,8 @@ export default function VoicePanel() {
     let lastInterimText = '';
 
     recognition.onresult = (event: any) => {
+      if (isSpeakingTtsRef.current) return;
+
       let interimTranscript = '';
       let finalTranscript = '';
 
@@ -209,10 +220,18 @@ export default function VoicePanel() {
 
     recognition.onerror = (event: any) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
-      console.warn('Speech recognition error:', event.error);
+      console.warn('[ION VOICE] Speech recognition warning/error:', event.error);
+      if (event.error === 'not-allowed') {
+        setErrorCode('MIC_PERMISSION_DENIED');
+        setError('Microphone permission denied.');
+      } else {
+        setErrorCode('SPEECH_RECOGNITION_ERROR');
+      }
     };
 
     recognition.onend = () => {
+      if (isSpeakingTtsRef.current) return;
+
       if (!isFinalizingRef.current && lastInterimText.trim().length > 0 && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected')) {
         const textToProcess = lastInterimText.trim();
         lastInterimText = '';
@@ -237,21 +256,27 @@ export default function VoicePanel() {
     recognitionRef.current = recognition;
     try {
       recognition.start();
+      console.log('[ION VOICE] SpeechRecognition instance started cleanly.');
     } catch (err) {
-      console.warn('Failed to start fresh SpeechRecognition:', err);
+      console.warn('[ION VOICE] Failed to start SpeechRecognition:', err);
     }
   }, [addMessage, handleVoiceResponse]);
 
   const startWakeListening = useCallback(async () => {
-    if (!handsFreeEnabledRef.current || !SpeechRecognition) return;
+    if (!handsFreeEnabledRef.current || !SpeechRecognition || isSpeakingTtsRef.current) return;
 
-    // Ensure mic stream is obtained before starting wake word detector
     if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
       try {
-        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('[ION VOICE] Requesting microphone stream getUserMedia({ audio: true })...');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
         setError('');
+        setErrorCode(null);
+        console.log('[ION VOICE] Microphone permission granted.');
+        console.log(`[ION VOICE] Audio stream active: ${stream.active}, Audio tracks: ${stream.getAudioTracks().length}`);
       } catch (err: any) {
-        console.warn('Microphone permission pending or denied:', err);
+        console.warn('[ION VOICE] Microphone permission pending or denied:', err);
+        setErrorCode('MIC_PERMISSION_DENIED');
         setError('Microphone permission required. Please click "Allow" in browser pop-up.');
         setVoiceStatus('offline');
         return;
@@ -275,9 +300,8 @@ export default function VoicePanel() {
       wakeDetectorRef.current = new WakeWordDetectorClient({
         wakePhrase: 'hey ion',
         onWakeWordDetected: (fullTranscript) => {
-          if (isFinalizingRef.current) return;
+          if (isFinalizingRef.current || isSpeakingTtsRef.current) return;
 
-          // Stop wake detector FIRST to free up speech recognition hardware
           try {
             wakeDetectorRef.current?.stop();
           } catch (_) {}
@@ -286,28 +310,30 @@ export default function VoicePanel() {
 
           const cleanText = (fullTranscript || '')
             .replace(/^hey ion[\s,.]*/i, '')
+            .replace(/^hi ion[\s,.]*/i, '')
+            .replace(/^hey iron[\s,.]*/i, '')
+            .replace(/^hey ian[\s,.]*/i, '')
             .replace(/^ion[\s,.]*/i, '')
             .trim();
 
           if (cleanText.length > 2) {
-            // User spoke the command immediately along with wake phrase
             setTranscript(cleanText);
             stateMachineRef.current?.transitionTo('END_OF_TURN');
             addMessage({ role: 'user', content: cleanText });
             handleVoiceResponse(cleanText);
           } else {
-            // Transition to listening for command cleanly with fresh SpeechRecognition instance
             setTimeout(() => {
               stateMachineRef.current?.transitionTo('LISTENING');
               createAndStartRecognition();
               if (mediaStreamRef.current) {
                 vadEngineRef.current?.start(mediaStreamRef.current);
               }
-            }, 200);
+            }, 150);
           }
         },
         onError: (err) => {
-          console.warn('Wake detector warning:', err);
+          console.warn('[ION VOICE] Wake detector error:', err);
+          setErrorCode('WAKE_NOT_DETECTED');
         },
       });
     }
@@ -320,20 +346,25 @@ export default function VoicePanel() {
   // Initialize Microphone Stream & VAD Engine
   useEffect(() => {
     if (!SpeechRecognition) {
+      setErrorCode('SPEECH_RECOGNITION_UNSUPPORTED');
       setError('Voice recognition is not supported in this browser.');
       setVoiceStatus('offline');
       return;
     }
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      console.log('[ION VOICE] Initializing voice hardware lifecycle...');
       navigator.mediaDevices
         .getUserMedia({ audio: true })
         .then((stream) => {
           mediaStreamRef.current = stream;
           setError('');
+          setErrorCode(null);
+          console.log('[ION VOICE] Microphone permission granted.');
+          console.log(`[ION VOICE] Audio stream active: ${stream.active}, Audio tracks: ${stream.getAudioTracks().length}`);
 
           vadEngineRef.current = new VADEngine({
-            speechThreshold: 15,
+            speechThreshold: 12,
             silenceTimeoutMs: 1500,
             minSpeechDurationMs: 300,
             onSpeechStart: () => {
@@ -348,6 +379,9 @@ export default function VoicePanel() {
                 } catch (_) {}
               }
             },
+            onDiagnostics: (info) => {
+              setVadInfo(info);
+            },
           });
 
           if (handsFreeEnabled) {
@@ -355,7 +389,8 @@ export default function VoicePanel() {
           }
         })
         .catch((err) => {
-          console.error('Microphone permission error:', err);
+          console.error('[ION VOICE] Microphone permission error:', err);
+          setErrorCode('MIC_PERMISSION_DENIED');
           setError('Microphone permission denied or device not accessible. Please grant mic access.');
           setVoiceStatus('offline');
         });
@@ -368,12 +403,14 @@ export default function VoicePanel() {
 
   const startManualListening = async () => {
     setError('');
+    setErrorCode(null);
     isFinalizingRef.current = false;
 
     if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
       try {
         mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (err: any) {
+        setErrorCode('MIC_PERMISSION_DENIED');
         setError('Microphone permission required. Click "Allow" in browser pop-up.');
         setVoiceStatus('offline');
         return;
@@ -394,6 +431,7 @@ export default function VoicePanel() {
 
   const runVoiceSimulationTest = async (testQuery = "Hey ION, what can you do?") => {
     setError('');
+    setErrorCode(null);
     isFinalizingRef.current = false;
     stateMachineRef.current?.transitionTo('WAKE_DETECTED');
     setTranscript(testQuery);
@@ -415,6 +453,7 @@ export default function VoicePanel() {
     const nextState = !handsFreeEnabled;
     setHandsFreeEnabled(nextState);
     setError('');
+    setErrorCode(null);
 
     if (nextState) {
       startWakeListening();
@@ -433,10 +472,35 @@ export default function VoicePanel() {
           <p className="text-xs uppercase tracking-[0.28em] text-slate-500">ION Hands-Free Voice</p>
           <h3 className="mt-2 text-xl font-semibold text-white">Ion Audio Hub</h3>
         </div>
-        <span className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.15em] ${status.color}`}>
-          {status.label}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:text-white transition"
+          >
+            <HiOutlineTerminal size={14} className="text-cyan-400" />
+            <span>Diagnostics</span>
+          </button>
+          <span className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.15em] ${status.color}`}>
+            {status.label}
+          </span>
+        </div>
       </div>
+
+      {showDiagnostics && vadInfo && (
+        <div className="mt-4 rounded-2xl border border-cyan-500/30 bg-slate-950/90 p-4 text-xs font-mono text-cyan-200">
+          <p className="font-bold text-cyan-300 uppercase tracking-wider mb-2">[ION VAD TELEMETRY]</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>micActive: <span className={vadInfo.micActive ? 'text-emerald-400 font-bold' : 'text-rose-400'}>{String(vadInfo.micActive)}</span></div>
+            <div>audioContext: <span className="text-white">{vadInfo.audioContextState}</span></div>
+            <div>inputLevel: <span className="text-brand-300 font-bold">{vadInfo.inputLevel}</span></div>
+            <div>noiseFloor: <span className="text-amber-300">{vadInfo.noiseFloor}</span></div>
+            <div>threshold: <span className="text-cyan-300">{vadInfo.threshold}</span></div>
+            <div>speechDetected: <span className={vadInfo.speechDetected ? 'text-emerald-400 font-bold' : 'text-slate-400'}>{String(vadInfo.speechDetected)}</span></div>
+            <div>voiceState: <span className="text-purple-300 font-bold">{vadInfo.currentVoiceState}</span></div>
+            <div>errorCode: <span className="text-rose-300">{errorCode || 'NONE'}</span></div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 md:grid-cols-[1fr_auto]">
         <div className="flex flex-col sm:flex-row flex-wrap gap-4">
@@ -512,7 +576,9 @@ export default function VoicePanel() {
 
           {error && (
             <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
-              <p className="text-sm font-semibold text-rose-300">{error}</p>
+              <p className="text-sm font-semibold text-rose-300">
+                {errorCode ? `[${errorCode}] ` : ''}{error}
+              </p>
               <button
                 onClick={() => startWakeListening()}
                 className="mt-2 rounded-xl bg-rose-500/25 px-4 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/40 transition border border-rose-400/30"

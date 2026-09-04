@@ -5,6 +5,44 @@ export interface WakeWordDetectorOptions {
   onError?: (err: string) => void;
 }
 
+export function isWakePhraseMatch(transcript: string, acceptedPhrases: string[] = ['hey ion', 'hi ion', 'hey iron', 'hey ian', 'hey eon', 'hey eye on', 'hey i on', 'hello ion']): boolean {
+  if (!transcript || transcript.trim().length === 0) return false;
+
+  const clean = transcript
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!clean) return false;
+
+  const forbiddenPhrases = ['ion battery', 'ion engine', 'hey everyone', 'hey every one'];
+  if (forbiddenPhrases.some(forbidden => clean.includes(forbidden))) {
+    return false;
+  }
+
+  if (clean === 'ion') {
+    return false;
+  }
+
+  for (const phrase of acceptedPhrases) {
+    if (clean === phrase || clean.startsWith(phrase + ' ')) {
+      return true;
+    }
+  }
+
+  const words = clean.split(' ');
+  if (words.length >= 2) {
+    const firstWord = words[0];
+    const secondWord = words[1];
+    if (['hey', 'hi', 'hello', 'ok', 'okay'].includes(firstWord) && ['ion', 'iron', 'ian', 'eon', 'eye'].includes(secondWord)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export class WakeWordDetectorClient {
   private recognition: any = null;
   private primaryWakePhrase: string;
@@ -16,7 +54,7 @@ export class WakeWordDetectorClient {
 
   constructor(options: WakeWordDetectorOptions = {}) {
     this.primaryWakePhrase = (options.wakePhrase || 'hey ion').toLowerCase().trim();
-    const defaultPhonetics = ['hey ion', 'hi ion', 'hey iron', 'hey ian', 'hey eon', 'hey eye on', 'hey i on'];
+    const defaultPhonetics = ['hey ion', 'hi ion', 'hey iron', 'hey ian', 'hey eon', 'hey eye on', 'hey i on', 'hello ion'];
     const suppliedVariants = options.phoneticVariants && options.phoneticVariants.length > 0 ? options.phoneticVariants : defaultPhonetics;
     this.phoneticVariants = suppliedVariants.map(v => v.toLowerCase().trim());
     this.acceptedPhrases = Array.from(new Set([this.primaryWakePhrase, ...this.phoneticVariants]));
@@ -52,13 +90,10 @@ export class WakeWordDetectorClient {
     this.recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const rawTranscript = event.results[i][0]?.transcript || '';
-        const cleanTranscript = rawTranscript
-          .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        if (!rawTranscript || rawTranscript.trim().length === 0) continue;
 
-        if (cleanTranscript.length >= 2) {
+        if (isWakePhraseMatch(rawTranscript, this.acceptedPhrases)) {
+          console.log(`[ION VOICE] Wake phrase detected! Raw: "${rawTranscript}"`);
           if (this.onWakeWordDetected) {
             this.onWakeWordDetected(rawTranscript);
           }
