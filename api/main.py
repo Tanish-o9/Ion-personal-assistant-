@@ -204,9 +204,6 @@ async def register_endpoint(request: Request, payload: AuthRequestPayload):
         if not username or not password:
             raise HTTPException(status_code=400, detail="Username and password are required.")
 
-        if default_user_store.get_by_username(username):
-            raise HTTPException(status_code=400, detail="User already exists. Please login instead.")
-
         p_hash = hash_password(password)
         user = default_user_store.register_user(username=username, password_hash=p_hash)
         token = create_token(user_id=user.id, username=user.username)

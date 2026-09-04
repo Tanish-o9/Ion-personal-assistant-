@@ -38,8 +38,8 @@ export default function LoginPage({ onSwitchToRegister }: LoginPageProps) {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-400/20 mb-4">
             <HiOutlineSparkles size={28} />
           </div>
-          <h1 className="text-2xl font-bold text-white">JARVIS Control Center</h1>
-          <p className="mt-1 text-xs text-slate-400">Sign in to access your multi-agent assistant</p>
+          <h1 className="text-2xl font-bold text-white">ION Control Center</h1>
+          <p className="mt-1 text-xs text-slate-400">Sign in to access your multi-user isolated ION access</p>
         </div>
 
         {error && (

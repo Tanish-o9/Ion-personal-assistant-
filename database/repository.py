@@ -55,6 +55,28 @@ class UserRepository:
         finally:
             db.close()
 
+    @staticmethod
+    def update_password(username: str, password_hash: str) -> UserModel:
+        db = SessionLocal()
+        try:
+            user = db.query(UserModel).filter(UserModel.username == username.strip().lower()).first()
+            if user:
+                user.password_hash = password_hash
+                db.commit()
+                db.refresh(user)
+                return user
+            else:
+                user = UserModel(username=username.strip().lower(), password_hash=password_hash)
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                return user
+        except Exception as exc:
+            db.rollback()
+            raise exc
+        finally:
+            db.close()
+
 class ConversationRepository:
     @staticmethod
     def create_or_get_conversation(session_id: str, user_id: str, title: str = "New Conversation") -> ConversationModel:

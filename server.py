@@ -86,10 +86,6 @@ def register_auth(payload: AuthPayload):
         if not username or not password:
             raise HTTPException(status_code=400, detail="Username and password are required.")
         
-        existing = default_user_store.get_by_username(username)
-        if existing:
-            raise HTTPException(status_code=400, detail="User already exists. Please login instead.")
-        
         p_hash = hash_password(password)
         user = default_user_store.register_user(username=username, password_hash=p_hash)
         token = create_token(user_id=user.id, username=user.username)
