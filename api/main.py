@@ -247,6 +247,12 @@ async def login_endpoint(request: Request, payload: AuthRequestPayload):
 async def get_me_endpoint(current_user: User = Depends(get_current_user)):
     return {"user": current_user.to_dict()}
 
+@app.post("/auth/refresh")
+@app.post("/api/auth/refresh")
+async def refresh_endpoint(current_user: User = Depends(get_current_user)):
+    token = create_token(user_id=current_user.id, username=current_user.username)
+    return {"token": token, "user": current_user.to_dict()}
+
 # --- User Resource Endpoints ---
 
 @app.get("/conversations")

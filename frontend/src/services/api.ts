@@ -10,9 +10,52 @@ export const api = axios.create({
   },
 });
 
+api.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('ion_token') || localStorage.getItem('jarvis_token') : null;
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/register')
+    ) {
+      originalRequest._retry = true;
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('ion_token') || localStorage.getItem('jarvis_token') : null;
+        if (token) {
+          const res = await axios.post(`${apiBaseUrl}/auth/refresh`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const newToken = res.data.token;
+          if (newToken) {
+            localStorage.setItem('ion_token', newToken);
+            api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return api(originalRequest);
+          }
+        }
+      } catch (_) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('ion_token');
+          localStorage.removeItem('ion_user');
+          localStorage.removeItem('jarvis_token');
+          localStorage.removeItem('jarvis_user');
+        }
+      }
+    }
     const message = error.response?.data?.detail || error.response?.data?.message || error.message || 'Unknown error';
     return Promise.reject(new Error(message));
   }

@@ -36,9 +36,9 @@ def verify_password(password: str, password_hash: str) -> bool:
     except Exception:
         return False
 
-def create_token(user_id: str, username: str, expires_in_seconds: int = 86400) -> str:
+def create_token(user_id: str, username: str, expires_in_seconds: int = 2592000) -> str:
     """
-    Generates a secure HMAC-SHA256 signed Bearer token containing user payload and expiration timestamp.
+    Generates a secure HMAC-SHA256 signed Bearer token containing user payload and long-lived expiration timestamp (30 days default).
     """
     payload = {
         "user_id": user_id,

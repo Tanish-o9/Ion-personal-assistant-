@@ -46,8 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(res.data.user);
           localStorage.setItem('ion_user', JSON.stringify(res.data.user));
         })
-        .catch(() => {
-          logout();
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            logout();
+          }
         })
         .finally(() => setIsLoading(false));
     } else {
