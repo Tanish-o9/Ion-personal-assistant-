@@ -13,7 +13,9 @@ class UserStore:
     """
     def register_user(self, username: str, password_hash: str) -> User:
         lowered_name = username.strip().lower()
-        db_user = UserRepository.update_password(username=lowered_name, password_hash=password_hash)
+        if self.get_by_username(lowered_name):
+            raise ValueError("Invalid registration data: Username is already registered.")
+        db_user = UserRepository.create_user(username=lowered_name, password_hash=password_hash)
         return User(id=db_user.id, username=db_user.username, password_hash=db_user.password_hash, created_at=db_user.created_at)
 
     def get_by_id(self, user_id: str) -> Optional[User]:

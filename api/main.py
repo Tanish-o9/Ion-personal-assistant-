@@ -463,6 +463,7 @@ async def reject_endpoint(approval_id: str, current_user: User = Depends(get_cur
 # --- Core Chat, Voice & WebSocket Endpoints ---
 
 @app.post("/chat", response_model=ChatResponsePayload)
+@app.post("/api/chat", response_model=ChatResponsePayload)
 async def chat_endpoint(payload: ChatRequestPayload, current_user: User = Depends(get_current_user)):
     if not default_rate_limiter.is_allowed(f"chat:{current_user.id}", max_requests=RATE_LIMIT_CHAT, window_seconds=60):
         raise HTTPException(status_code=429, detail="Chat rate limit exceeded. Please wait a moment.")
@@ -537,6 +538,7 @@ async def chat_endpoint(payload: ChatRequestPayload, current_user: User = Depend
         raise HTTPException(status_code=500, detail=f"Graph execution failed: {str(exc)}")
 
 @app.post("/voice")
+@app.post("/api/voice")
 async def voice_endpoint(payload: VoicePayload, current_user: User = Depends(get_current_user)):
     session_id = payload.session_id or str(uuid.uuid4())
     if not default_session_store.verify_ownership(session_id, current_user.id):
@@ -570,6 +572,7 @@ async def voice_endpoint(payload: VoicePayload, current_user: User = Depends(get
         raise HTTPException(status_code=500, detail=f"Voice pipeline failure: {str(exc)}")
 
 @app.websocket("/ws/{session_id}")
+@app.websocket("/api/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str, token: Optional[str] = Query(None)):
     payload = verify_token(token) if token else None
     if not payload:

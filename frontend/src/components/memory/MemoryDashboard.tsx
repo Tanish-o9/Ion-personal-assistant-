@@ -44,7 +44,7 @@ export default function MemoryDashboard() {
           ))
         ) : (
           <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/80 p-10 text-center text-slate-500">
-            No memory entries yet. Start a conversation to capture Jarvis memory.
+            No memory entries yet. Start a conversation to capture ION memory.
           </div>
         )}
       </div>

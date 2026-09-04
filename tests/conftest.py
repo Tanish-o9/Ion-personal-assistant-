@@ -3,13 +3,14 @@ import os
 from database import Base, engine, init_db
 from orchestrator.security import default_rate_limiter
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database_schema():
+@pytest.fixture(autouse=True)
+def reset_database_tables():
     """
-    Creates database schema ONCE per test session for performance and stability.
+    Clears database tables before each test function for total test isolation.
     """
     try:
-        init_db()
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
     except Exception:
         pass
     yield

@@ -25,7 +25,7 @@ export const EnterpriseDashboardPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', fontFamily: 'sans-serif', backgroundColor: '#0f172a', color: '#f8fafc', minHeight: '100vh' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>JARVIS 5.0 Enterprise Admin Dashboard</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>ION 5.0 Enterprise Admin Dashboard</h1>
       <p style={{ color: '#94a3b8', marginBottom: '24px' }}>
         Manage Organizations, Workspaces, Data Residency, Capability Governance, and Multi-Tier Budgets.
       </p>

@@ -73,7 +73,7 @@ export default function MemoryPanel({ userId = 'default_user' }: MemoryPanelProp
         <p className="py-4 text-xs text-rose-400">{error}</p>
       ) : memories.length === 0 ? (
         <div className="py-8 text-center text-xs text-slate-500 italic">
-          No persistent memories extracted yet. JARVIS automatically learns preferences from conversation.
+          No persistent memories extracted yet. ION automatically learns preferences from conversation.
         </div>
       ) : (
         <div className="space-y-3">

@@ -30,12 +30,12 @@ def test_memory_store_save_and_retrieve():
 
 def test_memory_store_delete():
     store = InMemoryStore()
-    record = MemoryRecord(user_id="user_1", content="User prefers FastAPI")
+    record = MemoryRecord(user_id="user_del_test", content="User prefers FastAPI")
     store.save(record)
 
-    deleted = store.delete(record.id, "user_1")
+    deleted = store.delete(record.id, "user_del_test")
     assert deleted is True
-    assert len(store.get_by_user("user_1")) == 0
+    assert len(store.get_by_user("user_del_test")) == 0
 
 # ---------------------------------------------------------------------------
 # 2. Memory Manager Unit Tests & Bounded Limits
