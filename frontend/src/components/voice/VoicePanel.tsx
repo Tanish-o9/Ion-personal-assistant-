@@ -478,7 +478,17 @@ export default function VoicePanel() {
           <div className="mt-6 rounded-3xl border border-white/10 bg-slate-900/80 p-4 text-sm text-slate-300 min-h-[120px]">
             {transcript || (handsFreeEnabled ? 'Listening for "Hey Ion"...' : 'Activate Hands-Free Mode above.')}
           </div>
-          {error && <p className="mt-4 text-sm text-rose-300">{error}</p>}
+          {error && (
+            <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
+              <p className="text-sm font-semibold text-rose-300">{error}</p>
+              <button
+                onClick={() => startWakeListening()}
+                className="mt-2 rounded-xl bg-rose-500/25 px-4 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/40 transition border border-rose-400/30"
+              >
+                Retry / Grant Mic Access
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
