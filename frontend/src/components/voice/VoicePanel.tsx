@@ -186,13 +186,14 @@ export default function VoicePanel() {
       try {
         stateMachineRef.current?.transitionTo('PROCESSING');
         const response = await postVoice({ audioInput: textToSend, model: currentModel });
-        addMessage({ role: 'assistant', content: response.message.content });
+        const responseText = response.message?.content || response.response_text || response.response || 'I am ready to help you.';
+        addMessage({ role: 'assistant', content: responseText });
         stateMachineRef.current?.transitionTo('SPEAKING');
 
         const synth = window.speechSynthesis;
         if (synth && 'SpeechSynthesisUtterance' in window) {
           synth.cancel(); // Stop any pending speech
-          const utterance = new SpeechSynthesisUtterance(response.message.content);
+          const utterance = new SpeechSynthesisUtterance(responseText);
           utterance.onend = () => {
             if (handsFreeEnabledRef.current) {
               startWakeListening();

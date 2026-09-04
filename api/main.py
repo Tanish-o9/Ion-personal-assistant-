@@ -117,8 +117,11 @@ class ChatResponsePayload(BaseModel):
 
 class VoicePayload(BaseModel):
     session_id: Optional[str] = None
-    audio_base64: str
+    audio_base64: Optional[str] = ""
     audio_format: Optional[str] = "wav"
+    audioInput: Optional[str] = ""
+    text_input: Optional[str] = ""
+    model: Optional[str] = "default"
 
 class JobCreatePayload(BaseModel):
     session_id: Optional[str] = None
@@ -555,6 +558,41 @@ async def voice_endpoint(payload: VoicePayload, current_user: User = Depends(get
 
     ConversationRepository.create_or_get_conversation(session_id, current_user.id)
 
+    text_content = (payload.text_input or payload.audioInput or "").strip()
+
+    if text_content:
+        ConversationRepository.save_message(session_id, "user", text_content)
+        config = {"configurable": {"thread_id": session_id, "user_id": current_user.id}}
+        inputs = {
+            "messages": [{"role": "user", "content": text_content}],
+            "session_id": session_id,
+            "user_id": current_user.id,
+            "active_memory": [],
+            "pending_action": None,
+            "tool_round_count": 0,
+        }
+        try:
+            final_state = await graph_app.ainvoke(inputs, config=config)
+            messages = final_state.get("messages", [])
+            last_response = get_message_content(messages[-1]) if messages else "No response generated."
+
+            ConversationRepository.save_message(session_id, "assistant", last_response)
+            return {
+                "session_id": session_id,
+                "transcript": text_content,
+                "response_text": last_response,
+                "message": {
+                    "role": "assistant",
+                    "content": last_response,
+                },
+                "status": "success",
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Voice execution failed: {str(exc)}")
+
+    if not payload.audio_base64:
+        raise HTTPException(status_code=400, detail="Either text_input/audioInput or audio_base64 must be provided.")
+
     try:
         audio_bytes = base64.b64decode(payload.audio_base64)
         if len(audio_bytes) > (MAX_UPLOAD_SIZE_MB * 1024 * 1024):
@@ -574,7 +612,9 @@ async def voice_endpoint(payload: VoicePayload, current_user: User = Depends(get
         voice_res = await default_voice_manager.process_voice_request(voice_req)
         ConversationRepository.save_message(session_id, "user", voice_res.transcript)
         ConversationRepository.save_message(session_id, "assistant", voice_res.response_text)
-        return voice_res.to_dict()
+        res_dict = voice_res.to_dict()
+        res_dict["message"] = {"role": "assistant", "content": voice_res.response_text}
+        return res_dict
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
