@@ -1,20 +1,24 @@
 import pytest
+import os
 from database import Base, engine, init_db
 from orchestrator.security import default_rate_limiter
 
-@pytest.fixture(autouse=True)
-def reset_database_and_rate_limits():
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_database_schema():
     """
-    Resets database tables and rate limits before each test run for strict test isolation.
+    Creates database schema ONCE per test session for performance and stability.
+    """
+    try:
+        init_db()
+    except Exception:
+        pass
+    yield
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """
+    Resets rate limits before each test function for test isolation.
     """
     default_rate_limiter.reset()
-    try:
-        Base.metadata.drop_all(bind=engine, checkfirst=True)
-    except Exception:
-        pass
-    try:
-        Base.metadata.create_all(bind=engine, checkfirst=True)
-    except Exception:
-        pass
     yield
     default_rate_limiter.reset()

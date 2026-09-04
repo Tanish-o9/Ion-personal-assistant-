@@ -10,31 +10,6 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: ion_user
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: ion_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
@@ -50,10 +25,9 @@ jobs:
 
       - name: Run Test Suite
         env:
-          DATABASE_URL: postgresql://ion_user:secure_password@127.0.0.1:5432/ion_db
-          REDIS_URL: redis://127.0.0.1:6379/0
-          SECRET_KEY: ci_secret_key
-          ION_ENV: test
+          DATABASE_URL: "sqlite:///./test_ion.db"
+          SECRET_KEY: "ci_secret_key"
+          ION_ENV: "test"
           ION_WAKE_PHRASE: "Hey Ion"
         run: |
           python -m pytest tests/test_voice.py tests/test_ion_100_scenarios.py tests/test_ion_5_master_e2e.py -v

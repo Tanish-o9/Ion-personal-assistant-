@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 logger = logging.getLogger(__name__)
 
 # Configurable DATABASE_URL with automatic fallback to local SQLite for lightweight development
-DEFAULT_DB_URL = "sqlite:///./jarvis.db"
+DEFAULT_DB_URL = "sqlite:///./ion.db"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
 # For SQLite, check_same_thread must be False for multi-threaded FastAPI execution
