@@ -329,53 +329,56 @@ export default function VoicePanel() {
     try {
       vadEngineRef.current?.stop();
     } catch (_) {}
+    try {
+      wakeDetectorRef.current?.stop();
+    } catch (_) {}
+    wakeDetectorRef.current = null;
 
     stateMachineRef.current?.resetToWakeListening();
 
-    if (!wakeDetectorRef.current) {
-      wakeDetectorRef.current = new WakeWordDetectorClient({
-        wakePhrase: 'hey ion',
-        onWakeWordDetected: (fullTranscript) => {
-          if (isFinalizingRef.current || isSpeakingTtsRef.current) return;
+    wakeDetectorRef.current = new WakeWordDetectorClient({
+      wakePhrase: 'hey ion',
+      onWakeWordDetected: (fullTranscript) => {
+        if (isFinalizingRef.current || isSpeakingTtsRef.current) return;
 
-          try {
-            wakeDetectorRef.current?.stop();
-          } catch (_) {}
+        try {
+          wakeDetectorRef.current?.stop();
+        } catch (_) {}
 
-          stateMachineRef.current?.transitionTo('WAKE_DETECTED');
+        stateMachineRef.current?.transitionTo('WAKE_DETECTED');
 
-          const cleanText = (fullTranscript || '')
-            .replace(/^hey ion[\s,.]*/i, '')
-            .replace(/^hi ion[\s,.]*/i, '')
-            .replace(/^hey iron[\s,.]*/i, '')
-            .replace(/^hey ian[\s,.]*/i, '')
-            .replace(/^ion[\s,.]*/i, '')
-            .trim();
+        const cleanText = (fullTranscript || '')
+          .replace(/^hey ion[\s,.]*/i, '')
+          .replace(/^hi ion[\s,.]*/i, '')
+          .replace(/^hey iron[\s,.]*/i, '')
+          .replace(/^hey ian[\s,.]*/i, '')
+          .replace(/^ion[\s,.]*/i, '')
+          .trim();
 
-          if (cleanText.length > 2) {
-            setTranscript(cleanText);
-            stateMachineRef.current?.transitionTo('END_OF_TURN');
-            addMessage({ role: 'user', content: cleanText });
-            handleVoiceResponse(cleanText);
-          } else {
-            setTimeout(() => {
-              stateMachineRef.current?.transitionTo('LISTENING');
-              createAndStartRecognition();
-              if (mediaStreamRef.current) {
-                vadEngineRef.current?.start(mediaStreamRef.current);
-              }
-            }, 150);
-          }
-        },
-        onError: (err) => {
-          console.warn('[ION VOICE] Wake detector error:', err);
-          setErrorCode('WAKE_NOT_DETECTED');
-        },
-      });
-    }
+        if (cleanText.length > 2) {
+          setTranscript(cleanText);
+          stateMachineRef.current?.transitionTo('END_OF_TURN');
+          addMessage({ role: 'user', content: cleanText });
+          handleVoiceResponse(cleanText);
+        } else {
+          setTimeout(() => {
+            stateMachineRef.current?.transitionTo('LISTENING');
+            createAndStartRecognition();
+            if (mediaStreamRef.current) {
+              vadEngineRef.current?.start(mediaStreamRef.current);
+            }
+          }, 150);
+        }
+      },
+      onError: (err) => {
+        console.warn('[ION VOICE] Wake detector error:', err);
+        setErrorCode('WAKE_NOT_DETECTED');
+      },
+    });
 
     try {
       wakeDetectorRef.current.start();
+      console.log('[ION VOICE] Fresh WakeWordDetectorClient started successfully.');
     } catch (_) {}
   }, [addMessage, createAndStartRecognition, handleVoiceResponse]);
 
