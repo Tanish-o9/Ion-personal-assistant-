@@ -1,0 +1,56 @@
+[
+  {
+    "id": "c6849650-c5cb-45d0-a3e5-6cb3c3fa4414",
+    "username": "calc_user",
+    "created_at": "2026-09-02T17:58:00.733097+00:00",
+    "password_hash": "d36dec8cb07b3864afeb99e3b947d878:81b2ce4380a223cd66422924dc856eaa446f494ce99360df8bea6ef3ccdaf934"
+  },
+  {
+    "id": "e77b223d-6199-449f-9a9e-0e08865dd609",
+    "username": "alice",
+    "created_at": "2026-09-02T17:58:00.952182+00:00",
+    "password_hash": "403fbec3b1b8316f57e79f0830243e6e:c2b188b21c2809020720bf6a2a902c5c52efdcda09f26e784a878e8151f846ef"
+  },
+  {
+    "id": "4839503e-8990-4376-9205-193511190c30",
+    "username": "user_a",
+    "created_at": "2026-09-02T17:58:01.072594+00:00",
+    "password_hash": "bb6464ab72443b8b9c5aa19029172daf:52fa1b32f6f141e6432b50e099cbb1d33bef929443dfc84affd4f895c49c1276"
+  },
+  {
+    "id": "01b6ca8f-f69f-432b-866b-32e6f141b30a",
+    "username": "user_b",
+    "created_at": "2026-09-02T17:58:01.110374+00:00",
+    "password_hash": "07eb35c6381ae251fa47bce98170cd0e:51fed67fadfd90011fcc42db2a7ea51988c481c3a4da9f5d12cf2a655feaab8c"
+  },
+  {
+    "id": "53e08991-5895-47de-8133-c9afb727b513",
+    "username": "mem_turn_user",
+    "created_at": "2026-09-02T17:58:15.838327+00:00",
+    "password_hash": "587d0a3f150b9e183cbe00858d7ad555:fe60c5c9b02c378386fd46ca697c2d2e27770b659f7a71e83f58582d1c5edde3"
+  },
+  {
+    "id": "d8d1f713-f6f9-420b-836c-03d7387b486d",
+    "username": "mm_user",
+    "created_at": "2026-09-02T17:58:25.280251+00:00",
+    "password_hash": "d2b642e0471d173f5e67a3f6b8289710:954eebf24fc01857b091ffd8015090ef5d25fc3cf78b4da7096ac52b6ff03565"
+  },
+  {
+    "id": "2fb160a0-9050-48d6-a2b8-f22b5db78074",
+    "username": "orch_user",
+    "created_at": "2026-09-02T17:58:27.525898+00:00",
+    "password_hash": "49e826ab9b5e568017da4f1740ed61dc:467bd3c7ce842603d841376b71a66adb3dd993117b05bc806b132457aa5dcb88"
+  },
+  {
+    "id": "53bf7ad9-f33c-475c-a93e-8a94e99507cf",
+    "username": "plan_user",
+    "created_at": "2026-09-02T17:58:31.335545+00:00",
+    "password_hash": "8a3123b8c93f0dac8486665c39d01137:d8941630fc85028714de6fec4b1287b3c8fb9fb51a262301490d9bc18a56496a"
+  },
+  {
+    "id": "174083aa-ef9c-4368-8174-f14689eca51b",
+    "username": "voice_user",
+    "created_at": "2026-09-02T17:58:38.482572+00:00",
+    "password_hash": "3fde23e4b890edafb481372af44eacc2:8e17e9937f28d8e90eee763d145b8e78e03d1bd7a99a6fee76ee9ecc59bbe88d"
+  }
+]

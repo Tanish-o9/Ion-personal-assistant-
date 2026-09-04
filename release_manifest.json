@@ -1,0 +1,41 @@
+{
+  "ION_VERSION": "5.0.0",
+  "assistant_identity": "ION",
+  "primary_wake_phrase": "Hey Ion",
+  "release_date": "2026-09-04",
+  "git_commit": "ion-v5-master-release",
+  "database_schema_version": "5.0.0",
+  "API_version": "5.0",
+  "frontend_version": "5.0.0",
+  "backend_version": "5.0.0",
+  "model_configuration": {
+    "primary_llm": "Gemini 3.6 Flash",
+    "fallback_llm": "Claude 3.5 Sonnet / Local Mistral",
+    "embedding_model": "text-embedding-004",
+    "vision_model": "Gemini 3.6 Vision",
+    "voice_model": "Whisper / SpeechSynthesizer"
+  },
+  "enabled_capabilities": [
+    "Chat",
+    "Memory",
+    "RAG",
+    "Research",
+    "Coding",
+    "Voice",
+    "Multimodal",
+    "Agents",
+    "Goals",
+    "Workflows",
+    "Connectors",
+    "Devices",
+    "Enterprise"
+  ],
+  "known_limitations": [
+    "Physical automation restricted to software API integration; no hardware actuation.",
+    "Data residency enforcement relies on active cloud multi-region deployment setup."
+  ],
+  "evaluation_status": "PASSED (100/100 Scenarios Verified)",
+  "security_status": "PASSED (16/16 Red-Team Probes Blocked)",
+  "deployment_status": "READY",
+  "final_status": "READY"
+}
