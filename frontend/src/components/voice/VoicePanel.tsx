@@ -185,8 +185,16 @@ export default function VoicePanel() {
 
     let lastInterimText = '';
 
+    recognition.onstart = () => {
+      console.log('[ION VOICE] SpeechRecognition session active.');
+      setError('');
+      setErrorCode(null);
+    };
+
     recognition.onresult = (event: any) => {
       if (isSpeakingTtsRef.current) return;
+      setError('');
+      setErrorCode(null);
 
       let interimTranscript = '';
       let finalTranscript = '';
@@ -219,11 +227,17 @@ export default function VoicePanel() {
     };
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
+        console.log(`[ION VOICE] Transient recognition state: ${event.error}`);
+        return;
+      }
       console.warn('[ION VOICE] Speech recognition warning/error:', event.error);
       if (event.error === 'not-allowed') {
         setErrorCode('MIC_PERMISSION_DENIED');
         setError('Microphone permission denied.');
+      } else if (event.error === 'network') {
+        setErrorCode('NETWORK_ERROR');
+        setError('Speech recognition network error. Please check internet connection.');
       } else {
         setErrorCode('SPEECH_RECOGNITION_ERROR');
       }
