@@ -226,7 +226,23 @@ export default function VoicePanel() {
       }
     };
 
-    recognition.onerror = (event: any) => {
+  // Finalization & Transcribing Safety Guard: Prevents UI getting stuck in "Finalizing Speech..."
+  useEffect(() => {
+    if (voiceStatus === 'end_of_turn' || voiceStatus === 'transcribing') {
+      const safetyGuard = setTimeout(() => {
+        if (voiceStatusRef.current === 'end_of_turn' || voiceStatusRef.current === 'transcribing') {
+          console.warn('[ION VOICE] Speech finalization safety guard triggered (4s timeout). Auto-resuming wake listening...');
+          isFinalizingRef.current = false;
+          if (handsFreeEnabledRef.current) {
+            startWakeListening();
+          }
+        }
+      }, 4000);
+      return () => clearTimeout(safetyGuard);
+    }
+  }, [voiceStatus, startWakeListening]);
+
+  recognition.onerror = (event: any) => {
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
         console.log(`[ION VOICE] Transient recognition state: ${event.error}`);
         return;
@@ -236,8 +252,14 @@ export default function VoicePanel() {
         setErrorCode('MIC_PERMISSION_DENIED');
         setError('Microphone permission denied.');
       } else if (event.error === 'network') {
+        console.warn('[ION VOICE] Web Speech API network warning. Scheduling auto-reconnection...');
         setErrorCode('NETWORK_ERROR');
-        setError('Speech recognition network error. Please check internet connection.');
+        setError('Speech recognition network warning. Auto-reconnecting voice recognition...');
+        setTimeout(() => {
+          if (handsFreeEnabledRef.current && !isSpeakingTtsRef.current && !isFinalizingRef.current) {
+            startWakeListening();
+          }
+        }, 600);
       } else {
         setErrorCode('SPEECH_RECOGNITION_ERROR');
       }
