@@ -35,7 +35,13 @@ export class WakeWordDetectorClient {
       return;
     }
 
-    if (this.isListening) return;
+    // Clean up previous instance cleanly
+    if (this.recognition) {
+      try {
+        this.recognition.abort();
+      } catch (_) {}
+      this.recognition = null;
+    }
 
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     this.recognition = new SpeechRec();
@@ -67,15 +73,12 @@ export class WakeWordDetectorClient {
     };
 
     this.recognition.onend = () => {
-      // Auto-restart with delay if listening mode is still active
       if (this.isListening) {
         setTimeout(() => {
-          if (this.isListening && this.recognition) {
-            try {
-              this.recognition.start();
-            } catch (_) {}
+          if (this.isListening) {
+            this.start(); // Re-create a fresh SpeechRecognition instance on auto-end
           }
-        }, 500);
+        }, 300);
       }
     };
 
@@ -92,7 +95,7 @@ export class WakeWordDetectorClient {
     this.isListening = false;
     if (this.recognition) {
       try {
-        this.recognition.stop();
+        this.recognition.abort();
       } catch (_) {}
       this.recognition = null;
     }
