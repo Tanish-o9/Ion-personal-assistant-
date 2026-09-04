@@ -55,9 +55,15 @@ export function useWebSocket(sessionId: string, userId: string = 'default_user',
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<any>(null);
+  const isUnmountedRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (!sessionId) return;
+    if (!sessionId || isUnmountedRef.current) return;
+
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
+      return;
+    }
 
     const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('ion_token') || localStorage.getItem('jarvis_token') : null);
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -140,7 +146,13 @@ export function useWebSocket(sessionId: string, userId: string = 'default_user',
 
       socket.onclose = () => {
         setIsConnected(false);
-        setActivityEvents((prev) => [...prev, '✖ WebSocket disconnected']);
+        if (!isUnmountedRef.current) {
+          setActivityEvents((prev) => [...prev, '✖ WebSocket disconnected. Reconnecting...']);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, 1500);
+        }
       };
 
       socket.onerror = () => {
@@ -152,9 +164,14 @@ export function useWebSocket(sessionId: string, userId: string = 'default_user',
   }, [sessionId, token]);
 
   useEffect(() => {
+    isUnmountedRef.current = false;
     connect();
 
     return () => {
+      isUnmountedRef.current = true;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.close();
       }
