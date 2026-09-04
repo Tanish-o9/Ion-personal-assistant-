@@ -9,16 +9,20 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 PRIMARY_WAKE_PHRASE: str = os.getenv("ION_WAKE_PHRASE", "Hey Ion")
-WAKE_WORDS: List[str] = [PRIMARY_WAKE_PHRASE.lower(), "hey iron", "hey ian"]
+DEFAULT_PHONETIC_VARIANTS: List[str] = [
+    v.strip().lower() for v in os.getenv("ION_WAKE_VARIANTS", "hey iron, hey ian").split(",") if v.strip()
+]
 
 class WakeWordDetector:
     """
     Wake word detector for ION assistant.
     Primary wake phrase: "Hey Ion"
+    Phonetic variants (e.g. "hey iron", "hey ian") are configurable via ION_WAKE_VARIANTS env.
     """
-    def __init__(self, wake_phrase: Optional[str] = None):
+    def __init__(self, wake_phrase: Optional[str] = None, phonetic_variants: Optional[List[str]] = None):
         self.wake_phrase = wake_phrase or PRIMARY_WAKE_PHRASE
-        self.accepted_phrases = [self.wake_phrase.lower(), "hey ion", "hey iron", "hey ian"]
+        self.phonetic_variants = phonetic_variants or DEFAULT_PHONETIC_VARIANTS
+        self.accepted_phrases = list(set([self.wake_phrase.lower().strip()] + [v.lower().strip() for v in self.phonetic_variants]))
 
     def is_wake_word_detected(self, text: str) -> bool:
         """

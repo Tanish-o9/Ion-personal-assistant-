@@ -1,18 +1,23 @@
 export interface WakeWordDetectorOptions {
   wakePhrase?: string;
+  phoneticVariants?: string[];
   onWakeWordDetected?: () => void;
   onError?: (err: string) => void;
 }
 
 export class WakeWordDetectorClient {
   private recognition: any = null;
-  private wakePhrase: string;
+  private primaryWakePhrase: string;
+  private phoneticVariants: string[];
+  private acceptedPhrases: string[];
   private isListening: boolean = false;
   private onWakeWordDetected?: () => void;
   private onError?: (err: string) => void;
 
   constructor(options: WakeWordDetectorOptions = {}) {
-    this.wakePhrase = (options.wakePhrase || 'hey ion').toLowerCase();
+    this.primaryWakePhrase = (options.wakePhrase || 'hey ion').toLowerCase().trim();
+    this.phoneticVariants = (options.phoneticVariants || ['hey iron', 'hey ian']).map(v => v.toLowerCase().trim());
+    this.acceptedPhrases = [this.primaryWakePhrase, ...this.phoneticVariants];
     this.onWakeWordDetected = options.onWakeWordDetected;
     this.onError = options.onError;
   }
@@ -38,12 +43,8 @@ export class WakeWordDetectorClient {
 
     this.recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = (event.results[i][0]?.transcript || '').toLowerCase().strip?.() || event.results[i][0]?.transcript.toLowerCase().trim();
-        if (
-          transcript.includes('hey ion') ||
-          transcript.includes('hey iron') ||
-          transcript.includes('hey ian')
-        ) {
+        const transcript = (event.results[i][0]?.transcript || '').toLowerCase().trim();
+        if (this.acceptedPhrases.some(phrase => transcript.includes(phrase))) {
           if (this.onWakeWordDetected) {
             this.onWakeWordDetected();
           }
