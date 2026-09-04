@@ -21,7 +21,7 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
           --health-retries 5
 
@@ -31,7 +31,7 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
           --health-retries 5
 
@@ -47,12 +47,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
 
-      - name: Run Core Test Suite
+      - name: Run Test Suite
         env:
-          DATABASE_URL: postgresql://ion_user:secure_password@localhost:5432/ion_db
-          REDIS_URL: redis://localhost:6379/0
+          DATABASE_URL: postgresql://ion_user:secure_password@127.0.0.1:5432/ion_db
+          REDIS_URL: redis://127.0.0.1:6379/0
           SECRET_KEY: ci_secret_key
           ION_ENV: test
           ION_WAKE_PHRASE: "Hey Ion"
