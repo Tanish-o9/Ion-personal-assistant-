@@ -41,9 +41,7 @@ export class WakeWordDetectorClient {
     this.recognition = new SpeechRec();
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
-    this.recognition.lang = 'en-US';
-
-    const WAKE_PATTERN = /(hey|hi|hello|aion)\b[\s\w]*(ion|iron|ian|eon|eye|john|neon|ai|one)\b/i;
+    this.recognition.lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
 
     this.recognition.onresult = (event: any) => {
       for (let i = 0; i < event.results.length; i++) {
@@ -54,10 +52,7 @@ export class WakeWordDetectorClient {
           .replace(/\s+/g, ' ')
           .trim();
 
-        const matchesAccepted = this.acceptedPhrases.some(phrase => cleanTranscript.includes(phrase));
-        const matchesPattern = WAKE_PATTERN.test(cleanTranscript) || cleanTranscript.includes('hey ion') || cleanTranscript.includes('hi ion');
-
-        if (matchesAccepted || matchesPattern) {
+        if (cleanTranscript.length >= 2) {
           if (this.onWakeWordDetected) {
             this.onWakeWordDetected(rawTranscript);
           }
