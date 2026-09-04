@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 PRIMARY_WAKE_PHRASE: str = os.getenv("ION_WAKE_PHRASE", "Hey Ion")
-WAKE_WORDS: List[str] = [PRIMARY_WAKE_PHRASE.lower(), "ion"]
+WAKE_WORDS: List[str] = [PRIMARY_WAKE_PHRASE.lower(), "hey iron", "hey ian"]
 
 class WakeWordDetector:
     """
@@ -18,12 +18,12 @@ class WakeWordDetector:
     """
     def __init__(self, wake_phrase: Optional[str] = None):
         self.wake_phrase = wake_phrase or PRIMARY_WAKE_PHRASE
-        self.accepted_phrases = [self.wake_phrase.lower(), "ion", "hey ion"]
+        self.accepted_phrases = [self.wake_phrase.lower(), "hey ion", "hey iron", "hey ian"]
 
     def is_wake_word_detected(self, text: str) -> bool:
         """
-        Returns True if the primary wake phrase "Hey Ion" or accepted ION wake word is detected in input text.
-        Returns False for legacy wake phrases like "Hey Jarvis".
+        Returns True if the primary wake phrase "Hey Ion" is detected in input text.
+        Returns False for standalone "ion", legacy "Hey Jarvis", or unrelated conversation.
         """
         if not text:
             return False

@@ -72,12 +72,15 @@ export default function VoicePanel() {
         addMessage({ role: 'assistant', content: response.message.content });
         stateMachineRef.current?.transitionTo('SPEAKING');
 
-        // Play audio TTS or simulate speaking turn duration
+        // Gate wake detector during TTS speech synthesis to prevent self-listen feedback loop
+        wakeDetectorRef.current?.stop();
+
         const synth = window.speechSynthesis;
         if (synth && 'SpeechSynthesisUtterance' in window) {
           const utterance = new SpeechSynthesisUtterance(response.message.content);
           utterance.onend = () => {
             if (handsFreeEnabled) {
+              wakeDetectorRef.current?.start();
               stateMachineRef.current?.resetToWakeListening();
             } else {
               stateMachineRef.current?.stop();
@@ -85,6 +88,7 @@ export default function VoicePanel() {
           };
           utterance.onerror = () => {
             if (handsFreeEnabled) {
+              wakeDetectorRef.current?.start();
               stateMachineRef.current?.resetToWakeListening();
             } else {
               stateMachineRef.current?.stop();
@@ -94,6 +98,7 @@ export default function VoicePanel() {
         } else {
           window.setTimeout(() => {
             if (handsFreeEnabled) {
+              wakeDetectorRef.current?.start();
               stateMachineRef.current?.resetToWakeListening();
             } else {
               stateMachineRef.current?.stop();

@@ -40,7 +40,7 @@ def test_hey_ion_wake_word_detection():
     detector = WakeWordDetector()
     assert detector.is_wake_word_detected("Hey Ion, what is the status?")
     assert detector.is_wake_word_detected("Hey Ion")
-    assert detector.is_wake_word_detected("ion start research")
+    assert not detector.is_wake_word_detected("ion start research")
     assert not detector.is_wake_word_detected("Hey Jarvis")
 
 # ---------------------------------------------------------------------------

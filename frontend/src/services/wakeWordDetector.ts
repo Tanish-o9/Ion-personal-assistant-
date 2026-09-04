@@ -42,8 +42,7 @@ export class WakeWordDetectorClient {
         if (
           transcript.includes('hey ion') ||
           transcript.includes('hey iron') ||
-          transcript.includes('hey ian') ||
-          transcript.includes('ion')
+          transcript.includes('hey ian')
         ) {
           if (this.onWakeWordDetected) {
             this.onWakeWordDetected();

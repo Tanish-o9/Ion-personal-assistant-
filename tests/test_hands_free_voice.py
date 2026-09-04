@@ -10,7 +10,10 @@ def test_hey_ion_wake_phrase_detection():
     detector = WakeWordDetector()
     assert detector.is_wake_word_detected("Hey Ion, what's the weather today?")
     assert detector.is_wake_word_detected("Hey Ion")
-    assert detector.is_wake_word_detected("ion explain docker")
+    assert detector.is_wake_word_detected("hey iron can you help me?")
+    assert detector.is_wake_word_detected("hey ian show me stats")
+    assert not detector.is_wake_word_detected("ion explain docker")
+    assert not detector.is_wake_word_detected("an ion battery was found")
     assert not detector.is_wake_word_detected("Hey Jarvis")
     assert not detector.is_wake_word_detected("random noise text")
 
