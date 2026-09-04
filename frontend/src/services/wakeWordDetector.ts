@@ -41,10 +41,15 @@ export class WakeWordDetectorClient {
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
 
+    const WAKE_PATTERN = /\b(hey|hi|hello)\b[\s\w]*\b(ion|iron|ian|eon|eye\s*on)\b/i;
+
     this.recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = (event.results[i][0]?.transcript || '').toLowerCase().trim();
-        if (this.acceptedPhrases.some(phrase => transcript.includes(phrase))) {
+        const matchesAccepted = this.acceptedPhrases.some(phrase => transcript.includes(phrase));
+        const matchesPattern = WAKE_PATTERN.test(transcript);
+
+        if (matchesAccepted || matchesPattern) {
           if (this.onWakeWordDetected) {
             this.onWakeWordDetected(transcript);
           }
