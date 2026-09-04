@@ -44,7 +44,7 @@ export default function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
             <HiOutlineSparkles size={28} />
           </div>
           <h1 className="text-2xl font-bold text-white">Create Account</h1>
-          <p className="mt-1 text-xs text-slate-400">Register for multi-user isolated JARVIS access</p>
+          <p className="mt-1 text-xs text-slate-400">Register for multi-user isolated ION access</p>
         </div>
 
         {error && (

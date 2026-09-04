@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
 import time
 import os
@@ -60,6 +60,62 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+from database import init_db
+from orchestrator.auth import (
+    hash_password,
+    verify_password,
+    create_token,
+    verify_token,
+    default_user_store,
+)
+from fastapi import Request
+
+init_db()
+
+class AuthPayload(BaseModel):
+    username: str
+    password: str
+
+@app.post("/auth/register")
+@app.post("/api/auth/register")
+def register_auth(payload: AuthPayload):
+    if not payload.username or not payload.password:
+        raise HTTPException(status_code=400, detail="Username and password are required.")
+    
+    existing = default_user_store.get_by_username(payload.username)
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists.")
+    
+    p_hash = hash_password(payload.password)
+    user = default_user_store.register_user(username=payload.username, password_hash=p_hash)
+    token = create_token(user_id=user.id, username=user.username)
+    return {"token": token, "user": user.to_dict()}
+
+@app.post("/auth/login")
+@app.post("/api/auth/login")
+def login_auth(payload: AuthPayload):
+    user = default_user_store.get_by_username(payload.username)
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+    
+    token = create_token(user_id=user.id, username=user.username)
+    return {"token": token, "user": user.to_dict()}
+
+@app.get("/auth/me")
+@app.get("/api/auth/me")
+def me_auth(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing authorization token.")
+    token_str = auth_header.split(" ")[1]
+    tok_payload = verify_token(token_str)
+    if not tok_payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    user = default_user_store.get_by_id(tok_payload.get("sub", ""))
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found.")
+    return {"user": user.to_dict()}
 
 class ChatRequest(BaseModel):
     question: str
