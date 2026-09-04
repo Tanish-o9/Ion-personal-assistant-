@@ -306,11 +306,10 @@ export default function VoicePanel() {
         stateMachineRef.current?.onSpeechStart();
       }
 
-      const textToProcess = finalTranscript || (event.results.length > 0 ? event.results[event.results.length - 1][0]?.transcript : '');
-
-      if (textToProcess && !isFinalizingRef.current && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected' || voiceStatusRef.current === 'listening')) {
-        const cleanText = textToProcess.trim();
-        if (cleanText.length > 1) {
+      if (finalTranscript && !isFinalizingRef.current) {
+        const cleanText = finalTranscript.trim();
+        if (cleanText.length > 0) {
+          lastInterimText = '';
           setTranscript(cleanText);
           stateMachineRef.current?.transitionTo('END_OF_TURN');
           addMessage({ role: 'user', content: cleanText });
@@ -325,10 +324,11 @@ export default function VoicePanel() {
     };
 
     recognition.onend = () => {
-      // If recognition ended while user was speaking and transcript wasn't finalized yet, process last interim text
-      if (!isFinalizingRef.current && lastInterimText.trim().length > 1 && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected')) {
+      // If recognition ended while user was speaking and final transcript wasn't processed yet, use last interim text
+      if (!isFinalizingRef.current && lastInterimText.trim().length > 0 && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected')) {
         const textToProcess = lastInterimText.trim();
         lastInterimText = '';
+        setTranscript(textToProcess);
         stateMachineRef.current?.transitionTo('END_OF_TURN');
         addMessage({ role: 'user', content: textToProcess });
         handleVoiceResponse(textToProcess);
