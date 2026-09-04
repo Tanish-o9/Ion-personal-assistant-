@@ -67,7 +67,10 @@ export default function VoicePanel() {
       wakeDetectorRef.current?.stop();
     } catch (_) {}
     try {
-      recognitionRef.current?.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
     } catch (_) {}
     try {
       vadEngineRef.current?.stop();
@@ -79,80 +82,6 @@ export default function VoicePanel() {
       mediaStreamRef.current = null;
     }
   }, []);
-
-  const startWakeListening = useCallback(async () => {
-    if (!handsFreeEnabledRef.current || !SpeechRecognition) return;
-
-    // Ensure mic stream is obtained before starting wake word detector
-    if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
-      try {
-        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setError('');
-      } catch (err: any) {
-        console.warn('Microphone permission pending or denied:', err);
-        setError('Microphone permission required. Please click "Allow" in browser pop-up.');
-        setVoiceStatus('offline');
-        return;
-      }
-    }
-
-    isFinalizingRef.current = false;
-    try {
-      recognitionRef.current?.stop();
-    } catch (_) {}
-    try {
-      vadEngineRef.current?.stop();
-    } catch (_) {}
-
-    stateMachineRef.current?.resetToWakeListening();
-
-    if (!wakeDetectorRef.current) {
-      wakeDetectorRef.current = new WakeWordDetectorClient({
-        wakePhrase: 'hey ion',
-        onWakeWordDetected: (fullTranscript) => {
-          if (isFinalizingRef.current) return;
-
-          // Stop wake detector FIRST to free up speech recognition hardware
-          try {
-            wakeDetectorRef.current?.stop();
-          } catch (_) {}
-
-          stateMachineRef.current?.transitionTo('WAKE_DETECTED');
-
-          const cleanText = (fullTranscript || '')
-            .replace(/^hey ion[\s,.]*/i, '')
-            .replace(/^ion[\s,.]*/i, '')
-            .trim();
-
-          if (cleanText.length > 2) {
-            // User spoke the command immediately along with wake phrase
-            setTranscript(cleanText);
-            stateMachineRef.current?.transitionTo('END_OF_TURN');
-            addMessage({ role: 'user', content: cleanText });
-            handleVoiceResponse(cleanText);
-          } else {
-            // Transition to listening for command
-            setTimeout(() => {
-              stateMachineRef.current?.transitionTo('LISTENING');
-              try {
-                recognitionRef.current?.start();
-              } catch (_) {}
-              if (mediaStreamRef.current) {
-                vadEngineRef.current?.start(mediaStreamRef.current);
-              }
-            }, 200);
-          }
-        },
-        onError: (err) => {
-          console.warn('Wake detector warning:', err);
-        },
-      });
-    }
-
-    try {
-      wakeDetectorRef.current.start();
-    } catch (_) {}
-  }, [addMessage]);
 
   const handleVoiceResponse = useCallback(
     async (finalTranscript: string) => {
@@ -174,7 +103,10 @@ export default function VoicePanel() {
 
       // Stop listening while processing & generating response
       try {
-        recognitionRef.current?.stop();
+        if (recognitionRef.current) {
+          recognitionRef.current.abort();
+          recognitionRef.current = null;
+        }
       } catch (_) {}
       try {
         vadEngineRef.current?.stop();
@@ -224,61 +156,18 @@ export default function VoicePanel() {
         isFinalizingRef.current = false;
       }
     },
-    [addMessage, currentModel, startWakeListening]
+    [addMessage, currentModel]
   );
 
-  // Initialize Microphone Stream & VAD Engine
-  useEffect(() => {
-    if (!SpeechRecognition) {
-      setError('Voice recognition is not supported in this browser.');
-      setVoiceStatus('offline');
-      return;
-    }
-
-    // Request microphone access explicitly
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          mediaStreamRef.current = stream;
-          setError('');
-
-          // Initialize VAD Engine
-          vadEngineRef.current = new VADEngine({
-            speechThreshold: 15,
-            silenceTimeoutMs: 1500,
-            minSpeechDurationMs: 300,
-            onSpeechStart: () => {
-              stateMachineRef.current?.onSpeechStart();
-            },
-            onSpeechEnd: () => {
-              if (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected') {
-                try {
-                  recognitionRef.current?.stop();
-                } catch (_) {}
-              }
-            },
-          });
-
-          if (handsFreeEnabled) {
-            startWakeListening();
-          }
-        })
-        .catch((err) => {
-          console.error('Microphone permission error:', err);
-          setError('Microphone permission denied or device not accessible. Please grant mic access.');
-          setVoiceStatus('offline');
-        });
-    }
-
-    return () => {
-      stopAllAudioResources();
-    };
-  }, [handsFreeEnabled, startWakeListening, setVoiceStatus, stopAllAudioResources]);
-
-  // Setup Web Speech Recognition for User Command Listening
-  useEffect(() => {
+  const createAndStartRecognition = useCallback(() => {
     if (!SpeechRecognition) return;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (_) {}
+      recognitionRef.current = null;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -324,7 +213,6 @@ export default function VoicePanel() {
     };
 
     recognition.onend = () => {
-      // If recognition ended while user was speaking and final transcript wasn't processed yet, use last interim text
       if (!isFinalizingRef.current && lastInterimText.trim().length > 0 && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected')) {
         const textToProcess = lastInterimText.trim();
         lastInterimText = '';
@@ -335,7 +223,6 @@ export default function VoicePanel() {
         return;
       }
 
-      // Auto restart listening if in command listening mode and not finalizing
       if (
         handsFreeEnabledRef.current &&
         !isFinalizingRef.current &&
@@ -348,12 +235,136 @@ export default function VoicePanel() {
     };
 
     recognitionRef.current = recognition;
-    return () => {
+    try {
+      recognition.start();
+    } catch (err) {
+      console.warn('Failed to start fresh SpeechRecognition:', err);
+    }
+  }, [addMessage, handleVoiceResponse]);
+
+  const startWakeListening = useCallback(async () => {
+    if (!handsFreeEnabledRef.current || !SpeechRecognition) return;
+
+    // Ensure mic stream is obtained before starting wake word detector
+    if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
       try {
-        recognition.stop();
-      } catch (_) {}
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setError('');
+      } catch (err: any) {
+        console.warn('Microphone permission pending or denied:', err);
+        setError('Microphone permission required. Please click "Allow" in browser pop-up.');
+        setVoiceStatus('offline');
+        return;
+      }
+    }
+
+    isFinalizingRef.current = false;
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    } catch (_) {}
+    try {
+      vadEngineRef.current?.stop();
+    } catch (_) {}
+
+    stateMachineRef.current?.resetToWakeListening();
+
+    if (!wakeDetectorRef.current) {
+      wakeDetectorRef.current = new WakeWordDetectorClient({
+        wakePhrase: 'hey ion',
+        onWakeWordDetected: (fullTranscript) => {
+          if (isFinalizingRef.current) return;
+
+          // Stop wake detector FIRST to free up speech recognition hardware
+          try {
+            wakeDetectorRef.current?.stop();
+          } catch (_) {}
+
+          stateMachineRef.current?.transitionTo('WAKE_DETECTED');
+
+          const cleanText = (fullTranscript || '')
+            .replace(/^hey ion[\s,.]*/i, '')
+            .replace(/^ion[\s,.]*/i, '')
+            .trim();
+
+          if (cleanText.length > 2) {
+            // User spoke the command immediately along with wake phrase
+            setTranscript(cleanText);
+            stateMachineRef.current?.transitionTo('END_OF_TURN');
+            addMessage({ role: 'user', content: cleanText });
+            handleVoiceResponse(cleanText);
+          } else {
+            // Transition to listening for command cleanly with fresh SpeechRecognition instance
+            setTimeout(() => {
+              stateMachineRef.current?.transitionTo('LISTENING');
+              createAndStartRecognition();
+              if (mediaStreamRef.current) {
+                vadEngineRef.current?.start(mediaStreamRef.current);
+              }
+            }, 200);
+          }
+        },
+        onError: (err) => {
+          console.warn('Wake detector warning:', err);
+        },
+      });
+    }
+
+    try {
+      wakeDetectorRef.current.start();
+    } catch (_) {}
+  }, [addMessage, createAndStartRecognition, handleVoiceResponse]);
+
+  // Initialize Microphone Stream & VAD Engine
+  useEffect(() => {
+    if (!SpeechRecognition) {
+      setError('Voice recognition is not supported in this browser.');
+      setVoiceStatus('offline');
+      return;
+    }
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          mediaStreamRef.current = stream;
+          setError('');
+
+          vadEngineRef.current = new VADEngine({
+            speechThreshold: 15,
+            silenceTimeoutMs: 1500,
+            minSpeechDurationMs: 300,
+            onSpeechStart: () => {
+              stateMachineRef.current?.onSpeechStart();
+            },
+            onSpeechEnd: () => {
+              if (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected') {
+                try {
+                  if (recognitionRef.current) {
+                    recognitionRef.current.stop();
+                  }
+                } catch (_) {}
+              }
+            },
+          });
+
+          if (handsFreeEnabled) {
+            startWakeListening();
+          }
+        })
+        .catch((err) => {
+          console.error('Microphone permission error:', err);
+          setError('Microphone permission denied or device not accessible. Please grant mic access.');
+          setVoiceStatus('offline');
+        });
+    }
+
+    return () => {
+      stopAllAudioResources();
     };
-  }, [handleVoiceResponse, addMessage]);
+  }, [handsFreeEnabled, startWakeListening, setVoiceStatus, stopAllAudioResources]);
 
   const startManualListening = async () => {
     setError('');
@@ -374,25 +385,10 @@ export default function VoicePanel() {
     } catch (_) {}
 
     stateMachineRef.current?.transitionTo('LISTENING');
-    try {
-      recognitionRef.current?.start();
-    } catch (_) {}
+    createAndStartRecognition();
 
     if (mediaStreamRef.current) {
       vadEngineRef.current?.start(mediaStreamRef.current);
-    }
-  };
-
-  const toggleHandsFree = () => {
-    const nextState = !handsFreeEnabled;
-    setHandsFreeEnabled(nextState);
-    setError('');
-
-    if (nextState) {
-      startWakeListening();
-    } else {
-      stopAllAudioResources();
-      stateMachineRef.current?.stop();
     }
   };
 
@@ -413,6 +409,19 @@ export default function VoicePanel() {
         }, 400);
       }, 300);
     }, 300);
+  };
+
+  const toggleHandsFree = () => {
+    const nextState = !handsFreeEnabled;
+    setHandsFreeEnabled(nextState);
+    setError('');
+
+    if (nextState) {
+      startWakeListening();
+    } else {
+      stopAllAudioResources();
+      stateMachineRef.current?.stop();
+    }
   };
 
   const status = statusMap[voiceStatus] || statusMap['idle'];
