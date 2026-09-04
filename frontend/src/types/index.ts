@@ -1,4 +1,16 @@
-export type VoiceStatus = 'idle' | 'listening' | 'processing' | 'speaking' | 'offline';
+export type VoiceStatus =
+  | 'idle'
+  | 'wake_listening'
+  | 'wake_detected'
+  | 'listening'
+  | 'speech_detected'
+  | 'user_speaking'
+  | 'end_of_turn'
+  | 'transcribing'
+  | 'processing'
+  | 'responding'
+  | 'speaking'
+  | 'offline';
 
 export type ModelOption = 'claude' | 'huggingFace' | 'gemini' | 'openai';
 

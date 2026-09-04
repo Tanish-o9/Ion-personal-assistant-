@@ -591,6 +591,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, token: Optio
                 await websocket.send_json({"event": "error", "message": "WebSocket message rate limit exceeded."})
                 continue
 
+            if data.get("action") == "wake_detected" or data.get("type") == "wake_detected":
+                await websocket.send_json({"event": "wake_detected", "session_id": session_id, "wake_phrase": "Hey Ion"})
+                default_metrics.record_ws_message("sent")
+                continue
+
+            if data.get("action") == "reset_wake" or data.get("type") == "reset_wake":
+                default_voice_manager.clear_cancellation(session_id)
+                await websocket.send_json({"event": "wake_listening", "session_id": session_id})
+                default_metrics.record_ws_message("sent")
+                continue
+
             if data.get("action") == "cancel" or data.get("type") == "cancel":
                 default_voice_manager.cancel_session(session_id)
                 await websocket.send_json({"event": "cancelled", "session_id": session_id})
@@ -622,6 +633,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, token: Optio
                         "session_id": session_id,
                         "text": voice_res.response_text,
                     })
+                    await websocket.send_json({"event": "speaking_completed", "session_id": session_id})
                     default_metrics.record_ws_message("sent")
                 except Exception as exc:
                     default_metrics.record_ws_error()
