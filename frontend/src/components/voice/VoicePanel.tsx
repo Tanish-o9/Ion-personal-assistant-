@@ -478,6 +478,29 @@ export default function VoicePanel() {
           <div className="mt-6 rounded-3xl border border-white/10 bg-slate-900/80 p-4 text-sm text-slate-300 min-h-[120px]">
             {transcript || (handsFreeEnabled ? 'Listening for "Hey Ion"...' : 'Activate Hands-Free Mode above.')}
           </div>
+          
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Quick Sample Voice Prompts:</span>
+            <button
+              onClick={() => runVoiceSimulationTest("What can you do?")}
+              className="rounded-xl border border-white/10 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/50 hover:text-white transition"
+            >
+              🎤 "What can you do?"
+            </button>
+            <button
+              onClick={() => runVoiceSimulationTest("Tell me a short joke")}
+              className="rounded-xl border border-white/10 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/50 hover:text-white transition"
+            >
+              🎤 "Tell me a short joke"
+            </button>
+            <button
+              onClick={() => runVoiceSimulationTest("Tell me a fact about space")}
+              className="rounded-xl border border-white/10 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:border-cyan-400/50 hover:text-white transition"
+            >
+              🎤 "Fact about space"
+            </button>
+          </div>
+
           {error && (
             <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
               <p className="text-sm font-semibold text-rose-300">{error}</p>
