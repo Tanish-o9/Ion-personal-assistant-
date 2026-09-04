@@ -80,42 +80,68 @@ class AuthPayload(BaseModel):
 @app.post("/auth/register")
 @app.post("/api/auth/register")
 def register_auth(payload: AuthPayload):
-    if not payload.username or not payload.password:
-        raise HTTPException(status_code=400, detail="Username and password are required.")
-    
-    existing = default_user_store.get_by_username(payload.username)
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists.")
-    
-    p_hash = hash_password(payload.password)
-    user = default_user_store.register_user(username=payload.username, password_hash=p_hash)
-    token = create_token(user_id=user.id, username=user.username)
-    return {"token": token, "user": user.to_dict()}
+    try:
+        username = (payload.username or "").strip()
+        password = (payload.password or "").strip()
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password are required.")
+        
+        existing = default_user_store.get_by_username(username)
+        if existing:
+            raise HTTPException(status_code=400, detail="User already exists. Please login instead.")
+        
+        p_hash = hash_password(password)
+        user = default_user_store.register_user(username=username, password_hash=p_hash)
+        token = create_token(user_id=user.id, username=user.username)
+        return {"token": token, "user": user.to_dict()}
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        print(f"[AUTH ERROR] Registration failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 @app.post("/auth/login")
 @app.post("/api/auth/login")
 def login_auth(payload: AuthPayload):
-    user = default_user_store.get_by_username(payload.username)
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
-    
-    token = create_token(user_id=user.id, username=user.username)
-    return {"token": token, "user": user.to_dict()}
+    try:
+        username = (payload.username or "").strip()
+        password = (payload.password or "").strip()
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password are required.")
+
+        user = default_user_store.get_by_username(username)
+        if not user or not verify_password(password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
+        
+        token = create_token(user_id=user.id, username=user.username)
+        return {"token": token, "user": user.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[AUTH ERROR] Login failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
 @app.get("/auth/me")
 @app.get("/api/auth/me")
 def me_auth(request: Request):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing authorization token.")
-    token_str = auth_header.split(" ")[1]
-    tok_payload = verify_token(token_str)
-    if not tok_payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-    user = default_user_store.get_by_id(tok_payload.get("sub", ""))
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found.")
-    return {"user": user.to_dict()}
+    try:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing authorization token.")
+        token_str = auth_header.split(" ")[1]
+        tok_payload = verify_token(token_str)
+        if not tok_payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired token.")
+        user = default_user_store.get_by_id(tok_payload.get("sub", ""))
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found.")
+        return {"user": user.to_dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Auth error: {str(e)}")
 
 class ChatRequest(BaseModel):
     question: str
