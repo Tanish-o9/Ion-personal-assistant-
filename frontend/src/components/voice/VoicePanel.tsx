@@ -336,6 +336,34 @@ export default function VoicePanel() {
     };
   }, [handleVoiceResponse, addMessage]);
 
+  const startManualListening = async () => {
+    setError('');
+    isFinalizingRef.current = false;
+
+    if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
+      try {
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err: any) {
+        setError('Microphone permission required. Click "Allow" in browser pop-up.');
+        setVoiceStatus('offline');
+        return;
+      }
+    }
+
+    try {
+      wakeDetectorRef.current?.stop();
+    } catch (_) {}
+
+    stateMachineRef.current?.transitionTo('LISTENING');
+    try {
+      recognitionRef.current?.start();
+    } catch (_) {}
+
+    if (mediaStreamRef.current) {
+      vadEngineRef.current?.start(mediaStreamRef.current);
+    }
+  };
+
   const toggleHandsFree = () => {
     const nextState = !handsFreeEnabled;
     setHandsFreeEnabled(nextState);
@@ -364,28 +392,39 @@ export default function VoicePanel() {
       </div>
 
       <div className="mt-8 grid gap-6 md:grid-cols-[1fr_auto]">
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={toggleHandsFree}
-          className={`group relative inline-flex items-center justify-center rounded-[1.75rem] px-6 py-5 font-semibold transition ${
-            handsFreeEnabled
-              ? 'bg-brand-500 text-slate-950 shadow-lg shadow-brand-500/30 hover:bg-brand-400'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          <span className="absolute inset-0 rounded-[1.75rem] bg-gradient-to-br from-brand-400 to-cyan-400 opacity-30 blur-xl transition group-hover:opacity-60" />
-          <HiOutlineSparkles size={22} className="relative z-10" />
-          <span className="relative z-10 ml-3">
-            {handsFreeEnabled ? 'Hands-Free Mode Enabled ("Hey Ion")' : 'Enable Hands-Free Voice'}
-          </span>
-        </motion.button>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={toggleHandsFree}
+            className={`group relative inline-flex items-center justify-center rounded-[1.75rem] px-6 py-5 font-semibold transition ${
+              handsFreeEnabled
+                ? 'bg-brand-500 text-slate-950 shadow-lg shadow-brand-500/30 hover:bg-brand-400'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span className="absolute inset-0 rounded-[1.75rem] bg-gradient-to-br from-brand-400 to-cyan-400 opacity-30 blur-xl transition group-hover:opacity-60" />
+            <HiOutlineSparkles size={22} className="relative z-10" />
+            <span className="relative z-10 ml-3">
+              {handsFreeEnabled ? 'Hands-Free ("Hey Ion")' : 'Enable Hands-Free'}
+            </span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={startManualListening}
+            className="group relative inline-flex items-center justify-center rounded-[1.75rem] border border-cyan-400/30 bg-cyan-500/20 px-6 py-5 font-semibold text-cyan-200 hover:bg-cyan-500/30 transition"
+          >
+            <HiOutlineMicrophone size={22} className="text-cyan-400 animate-pulse" />
+            <span className="ml-3">Tap to Speak Now</span>
+          </motion.button>
+        </div>
 
         <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/80 p-5">
           <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-cyan-400 via-brand-500 to-violet-400 opacity-40" />
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Live Voice Turn</p>
-              <p className="mt-2 text-base text-slate-200">Say "Hey Ion" to activate without pressing buttons</p>
+              <p className="mt-2 text-base text-slate-200">Say "Hey Ion" or click "Tap to Speak Now"</p>
             </div>
             <HiOutlineVolumeUp size={26} className="text-cyan-300" />
           </div>
