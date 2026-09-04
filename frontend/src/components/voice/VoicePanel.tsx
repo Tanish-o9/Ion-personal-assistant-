@@ -283,7 +283,9 @@ export default function VoicePanel() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
+
+    let lastInterimText = '';
 
     recognition.onresult = (event: any) => {
       let interimTranscript = '';
@@ -299,15 +301,21 @@ export default function VoicePanel() {
       }
 
       if (interimTranscript) {
+        lastInterimText = interimTranscript;
         setTranscript(interimTranscript);
         stateMachineRef.current?.onSpeechStart();
       }
 
-      if (finalTranscript && !isFinalizingRef.current) {
-        setTranscript(finalTranscript);
-        stateMachineRef.current?.transitionTo('END_OF_TURN');
-        addMessage({ role: 'user', content: finalTranscript });
-        handleVoiceResponse(finalTranscript);
+      const textToProcess = finalTranscript || (event.results.length > 0 ? event.results[event.results.length - 1][0]?.transcript : '');
+
+      if (textToProcess && !isFinalizingRef.current && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected' || voiceStatusRef.current === 'listening')) {
+        const cleanText = textToProcess.trim();
+        if (cleanText.length > 1) {
+          setTranscript(cleanText);
+          stateMachineRef.current?.transitionTo('END_OF_TURN');
+          addMessage({ role: 'user', content: cleanText });
+          handleVoiceResponse(cleanText);
+        }
       }
     };
 
@@ -317,6 +325,16 @@ export default function VoicePanel() {
     };
 
     recognition.onend = () => {
+      // If recognition ended while user was speaking and transcript wasn't finalized yet, process last interim text
+      if (!isFinalizingRef.current && lastInterimText.trim().length > 1 && (voiceStatusRef.current === 'user_speaking' || voiceStatusRef.current === 'speech_detected')) {
+        const textToProcess = lastInterimText.trim();
+        lastInterimText = '';
+        stateMachineRef.current?.transitionTo('END_OF_TURN');
+        addMessage({ role: 'user', content: textToProcess });
+        handleVoiceResponse(textToProcess);
+        return;
+      }
+
       // Auto restart listening if in command listening mode and not finalizing
       if (
         handsFreeEnabledRef.current &&
