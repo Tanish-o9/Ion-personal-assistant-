@@ -16,7 +16,9 @@ export class WakeWordDetectorClient {
 
   constructor(options: WakeWordDetectorOptions = {}) {
     this.primaryWakePhrase = (options.wakePhrase || 'hey ion').toLowerCase().trim();
-    this.phoneticVariants = (options.phoneticVariants || []).map(v => v.toLowerCase().trim());
+    const defaultPhonetics = ['hey ion', 'hi ion', 'hey iron', 'hey ian', 'hey eon', 'hey eye on', 'hey i on'];
+    const suppliedVariants = options.phoneticVariants && options.phoneticVariants.length > 0 ? options.phoneticVariants : defaultPhonetics;
+    this.phoneticVariants = suppliedVariants.map(v => v.toLowerCase().trim());
     this.acceptedPhrases = Array.from(new Set([this.primaryWakePhrase, ...this.phoneticVariants]));
     this.onWakeWordDetected = options.onWakeWordDetected;
     this.onError = options.onError;
@@ -41,17 +43,23 @@ export class WakeWordDetectorClient {
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
 
-    const WAKE_PATTERN = /\b(hey|hi|hello)\b[\s\w]*\b(ion|iron|ian|eon|eye\s*on)\b/i;
+    const WAKE_PATTERN = /(hey|hi|hello|aion)\b[\s\w]*(ion|iron|ian|eon|eye|john|neon|ai|one)\b/i;
 
     this.recognition.onresult = (event: any) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = (event.results[i][0]?.transcript || '').toLowerCase().trim();
-        const matchesAccepted = this.acceptedPhrases.some(phrase => transcript.includes(phrase));
-        const matchesPattern = WAKE_PATTERN.test(transcript);
+      for (let i = 0; i < event.results.length; i++) {
+        const rawTranscript = event.results[i][0]?.transcript || '';
+        const cleanTranscript = rawTranscript
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const matchesAccepted = this.acceptedPhrases.some(phrase => cleanTranscript.includes(phrase));
+        const matchesPattern = WAKE_PATTERN.test(cleanTranscript) || cleanTranscript.includes('hey ion') || cleanTranscript.includes('hi ion');
 
         if (matchesAccepted || matchesPattern) {
           if (this.onWakeWordDetected) {
-            this.onWakeWordDetected(transcript);
+            this.onWakeWordDetected(rawTranscript);
           }
           break;
         }
