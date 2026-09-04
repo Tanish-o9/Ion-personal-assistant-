@@ -50,7 +50,7 @@ export class WakeWordDetectorClient {
     this.recognition.lang = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
 
     this.recognition.onresult = (event: any) => {
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const rawTranscript = event.results[i][0]?.transcript || '';
         const cleanTranscript = rawTranscript
           .toLowerCase()
