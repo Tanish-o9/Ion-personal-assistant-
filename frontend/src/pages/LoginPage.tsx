@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { HiOutlineSparkles, HiOutlineLockClosed, HiOutlineUser } from 'react-icons/hi';
+import { HiOutlineSparkles, HiOutlineLockClosed, HiOutlineUser, HiEye, HiEyeOff } from 'react-icons/hi';
 import { AuthContext } from '../contexts/AuthContext';
 
 interface LoginPageProps {
@@ -10,6 +10,7 @@ export default function LoginPage({ onSwitchToRegister }: LoginPageProps) {
   const { login } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -69,13 +70,20 @@ export default function LoginPage({ onSwitchToRegister }: LoginPageProps) {
             <div className="relative">
               <HiOutlineLockClosed size={18} className="absolute left-4 top-3.5 text-slate-500" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
+                className="w-full rounded-2xl border border-white/10 bg-slate-950/80 pl-11 pr-11 py-3 text-sm text-white outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10"
                 placeholder="Enter your password"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-3.5 text-slate-500 hover:text-slate-300 transition"
+              >
+                {showPassword ? <HiEyeOff size={18} /> : <HiEye size={18} />}
+              </button>
             </div>
           </div>
 

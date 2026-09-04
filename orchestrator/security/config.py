@@ -4,7 +4,7 @@ from typing import List
 # Centralized security settings loaded from environment variables with safe defaults
 ALLOWED_ORIGINS: List[str] = [
     origin.strip()
-    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173").split(",")
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:4173").split(",")
     if origin.strip()
 ]
 
