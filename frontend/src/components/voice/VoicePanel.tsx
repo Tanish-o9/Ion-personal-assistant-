@@ -80,8 +80,21 @@ export default function VoicePanel() {
     }
   }, []);
 
-  const startWakeListening = useCallback(() => {
+  const startWakeListening = useCallback(async () => {
     if (!handsFreeEnabledRef.current || !SpeechRecognition) return;
+
+    // Ensure mic stream is obtained before starting wake word detector
+    if (!mediaStreamRef.current && navigator.mediaDevices?.getUserMedia) {
+      try {
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setError('');
+      } catch (err: any) {
+        console.warn('Microphone permission pending or denied:', err);
+        setError('Microphone permission required. Please click "Allow" in browser pop-up.');
+        setVoiceStatus('offline');
+        return;
+      }
+    }
 
     isFinalizingRef.current = false;
     try {
@@ -136,8 +149,10 @@ export default function VoicePanel() {
       });
     }
 
-    wakeDetectorRef.current.start();
-  }, []);
+    try {
+      wakeDetectorRef.current.start();
+    } catch (_) {}
+  }, [addMessage]);
 
   const handleVoiceResponse = useCallback(
     async (finalTranscript: string) => {

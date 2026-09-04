@@ -59,11 +59,15 @@ export class WakeWordDetectorClient {
     };
 
     this.recognition.onend = () => {
-      // Auto-restart if listening mode is still active
+      // Auto-restart with delay if listening mode is still active
       if (this.isListening) {
-        try {
-          this.recognition?.start();
-        } catch (_) {}
+        setTimeout(() => {
+          if (this.isListening && this.recognition) {
+            try {
+              this.recognition.start();
+            } catch (_) {}
+          }
+        }, 500);
       }
     };
 
