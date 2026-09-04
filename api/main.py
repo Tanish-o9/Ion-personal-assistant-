@@ -250,6 +250,7 @@ async def get_me_endpoint(current_user: User = Depends(get_current_user)):
 # --- User Resource Endpoints ---
 
 @app.get("/conversations")
+@app.get("/api/conversations")
 async def get_conversations(current_user: User = Depends(get_current_user)):
     convs = ConversationRepository.get_user_conversations(current_user.id)
     return [
@@ -263,6 +264,7 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
     ]
 
 @app.get("/conversations/{session_id}/messages")
+@app.get("/api/conversations/{session_id}/messages")
 async def get_session_messages(session_id: str, current_user: User = Depends(get_current_user)):
     if not default_session_store.verify_ownership(session_id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied: Cannot access another user's session.")
@@ -280,6 +282,7 @@ async def get_session_messages(session_id: str, current_user: User = Depends(get
     ]
 
 @app.get("/memory/{user_id}")
+@app.get("/api/memory/{user_id}")
 async def get_user_memories(user_id: str, current_user: User = Depends(get_current_user)):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied: Cannot access another user's memories.")
@@ -288,6 +291,7 @@ async def get_user_memories(user_id: str, current_user: User = Depends(get_curre
     return [r.to_dict() for r in records]
 
 @app.delete("/memory/{user_id}/{memory_id}")
+@app.delete("/api/memory/{user_id}/{memory_id}")
 async def delete_user_memory(user_id: str, memory_id: str, current_user: User = Depends(get_current_user)):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied: Cannot modify another user's memories.")
@@ -302,6 +306,7 @@ async def delete_user_memory(user_id: str, memory_id: str, current_user: User = 
     return {"status": "success", "deleted_id": memory_id}
 
 @app.get("/profile/{user_id}")
+@app.get("/api/profile/{user_id}")
 async def get_user_profile(user_id: str, current_user: User = Depends(get_current_user)):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Access denied: Cannot access another user's profile.")
@@ -332,6 +337,7 @@ async def get_user_profile(user_id: str, current_user: User = Depends(get_curren
 # --- Background Jobs Endpoints ---
 
 @app.post("/jobs")
+@app.post("/api/jobs")
 async def create_background_job(payload: JobCreatePayload, current_user: User = Depends(get_current_user)):
     user_jobs = default_job_manager.get_user_jobs(current_user.id)
     active_count = sum(1 for j in user_jobs if j.status in {"pending", "running"})
@@ -351,11 +357,13 @@ async def create_background_job(payload: JobCreatePayload, current_user: User = 
     return job.to_dict()
 
 @app.get("/jobs")
+@app.get("/api/jobs")
 async def list_user_jobs(current_user: User = Depends(get_current_user)):
     jobs = default_job_manager.get_user_jobs(current_user.id)
     return [j.to_dict() for j in jobs[:50]]
 
 @app.get("/jobs/{job_id}")
+@app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str, current_user: User = Depends(get_current_user)):
     job = default_job_manager.get_job(job_id, current_user.id)
     if not job:
@@ -363,6 +371,7 @@ async def get_job_status(job_id: str, current_user: User = Depends(get_current_u
     return job.to_dict()
 
 @app.post("/jobs/{job_id}/cancel")
+@app.post("/api/jobs/{job_id}/cancel")
 async def cancel_job_endpoint(job_id: str, current_user: User = Depends(get_current_user)):
     success = default_job_manager.cancel_job(job_id, current_user.id)
     if not success:
@@ -372,6 +381,7 @@ async def cancel_job_endpoint(job_id: str, current_user: User = Depends(get_curr
 # --- Phase 25 Automation Endpoints ---
 
 @app.post("/automations")
+@app.post("/api/automations")
 async def create_automation_endpoint(payload: AutomationCreateRequest, current_user: User = Depends(get_current_user)):
     auto_dict = default_automation_manager.create_automation(
         user_id=current_user.id,
@@ -384,6 +394,7 @@ async def create_automation_endpoint(payload: AutomationCreateRequest, current_u
     return auto_dict
 
 @app.get("/automations")
+@app.get("/api/automations")
 async def list_automations_endpoint(current_user: User = Depends(get_current_user)):
     return default_automation_manager.list_automations(current_user.id)
 

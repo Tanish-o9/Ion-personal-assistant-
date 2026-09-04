@@ -59,9 +59,10 @@ export function useWebSocket(sessionId: string, userId: string = 'default_user',
   const connect = useCallback(() => {
     if (!sessionId) return;
 
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('ion_token') || localStorage.getItem('jarvis_token') : null);
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const baseUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.hostname}:8000/ws/${sessionId}`;
-    const host = token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl;
+    const host = authToken ? `${baseUrl}?token=${encodeURIComponent(authToken)}` : baseUrl;
 
     try {
       const socket = new WebSocket(host);

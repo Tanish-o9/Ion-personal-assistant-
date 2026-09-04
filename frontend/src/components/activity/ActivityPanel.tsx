@@ -15,7 +15,7 @@ export default function ActivityPanel({ events, isConnected }: ActivityPanelProp
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Live Telemetry</p>
-            <h3 className="text-lg font-semibold text-white">JARVIS Activity</h3>
+            <h3 className="text-lg font-semibold text-white">ION Activity</h3>
           </div>
         </div>
         <span
